@@ -47,16 +47,75 @@ class AuthRepository {
 
     try {
       final response = await _apiClient.post(path, data: request.toJson());
-      debugPrint('[AuthRepo] Register response status=${response.statusCode}');
-      debugPrint(
-        '[AuthRepo] Register response body=${_sanitizeResponse(response.data)}',
-      );
-      return RegistrationResponse.fromJson(
-        (response.data as Map).cast<String, dynamic>(),
-      );
+      return _parseRegisterResponse(response, 'Register');
     } on DioException catch (e) {
       _logDioError('Register', e);
-      throw _mapDioException(e, defaultMessage: 'Unable to register patient.');
+      final mapped = _mapDioException(
+        e,
+        defaultMessage: 'Unable to register patient.',
+      );
+
+      // The backend may create the patient and then time out / drop the
+      // connection while preparing the verification email (cold start on
+      // Render's free tier). Retry once with a short timeout to determine
+      // the true server-side state:
+      //  - a 2xx retry → the patient exists → success.
+      //  - a duplicate-email 400/409 retry → PROVES the first attempt
+      //    succeeded (the patient row was already committed) → success.
+      if (mapped is NetworkException) {
+        debugPrint(
+          '[AuthRepo] Register network failure detected — retrying once to '
+          'confirm whether the patient was created server-side.',
+        );
+        try {
+          final retry = await _apiClient.post(
+            path,
+            data: request.toJson(),
+            connectTimeout: const Duration(seconds: 15),
+            receiveTimeout: const Duration(seconds: 25),
+          );
+          debugPrint(
+            '[AuthRepo] Register retry response status=${retry.statusCode}',
+          );
+          debugPrint(
+            '[AuthRepo] Register retry response body=${_sanitizeResponse(retry.data)}',
+          );
+          return _parseRegisterResponse(retry, 'Register retry');
+        } on DioException catch (retryError) {
+          _logDioError('Register retry', retryError);
+
+          // Duplicate email on retry proves the original submission created
+          // the patient.
+          final retryResponse = retryError.response;
+          if (retryResponse != null &&
+              _isDuplicateEmailResponse(retryResponse)) {
+            debugPrint(
+              '[AuthRepo] Retry returned duplicate-email — original '
+              'registration actually succeeded.',
+            );
+            return RegistrationResponse(
+              detail:
+                  _extractServerMessage(retryResponse.data) ??
+                  'Registration successful. Check your email to verify your account.',
+            );
+          }
+
+          // If the retry produced a definitive HTTP error (non-duplicate),
+          // surface it — it is more accurate than the original network error.
+          if (retryError.response != null) {
+            throw _mapDioException(
+              retryError,
+              defaultMessage: 'Unable to register patient.',
+            );
+          }
+
+          // Otherwise the retry also failed at the network layer — rethrow the
+          // original network error.
+          throw mapped;
+        }
+      }
+
+      throw mapped;
     }
   }
 
@@ -186,6 +245,66 @@ class AuthRepository {
       _logDioError('Refresh token', e);
       throw _mapDioException(e, defaultMessage: 'Unable to refresh token.');
     }
+  }
+
+  /// Parses a registration response that may have ANY 2xx shape:
+  /// a Map (typical `{"detail": ...}`), a plain string, or an empty body.
+  /// This avoids the previous hard `(response.data as Map)` cast which
+  /// crashed on non-Map success bodies.
+  RegistrationResponse _parseRegisterResponse(
+    Response response,
+    String action,
+  ) {
+    debugPrint('[AuthRepo] $action response status=${response.statusCode}');
+    debugPrint(
+      '[AuthRepo] $action response body=${_sanitizeResponse(response.data)}',
+    );
+
+    final data = response.data;
+    if (data is Map) {
+      return RegistrationResponse.fromJson(data.cast<String, dynamic>());
+    }
+
+    if (data is String && data.trim().isNotEmpty) {
+      debugPrint('[AuthRepo] $action returned a plain-string body.');
+      return RegistrationResponse(detail: data.trim());
+    }
+
+    debugPrint(
+      '[AuthRepo] $action returned an empty/non-map body — using default '
+      'success detail.',
+    );
+    return const RegistrationResponse(
+      detail:
+          'Registration successful. Check your email to verify your account.',
+    );
+  }
+
+  /// Returns true when an HTTP response signals a duplicate email, which is
+  /// the definitive proof that the patient was already created server-side.
+  bool _isDuplicateEmailResponse(Response response) {
+    final status = response.statusCode;
+    if (status != 400 && status != 409) return false;
+
+    final data = response.data;
+    if (data is Map) {
+      final detail = data['detail'];
+      if (detail is String && detail.toLowerCase().contains('already exists')) {
+        return true;
+      }
+
+      final errors = data['errors'];
+      if (errors is Map && errors.containsKey('email')) {
+        final emailErrors = errors['email'];
+        if (emailErrors is List) {
+          return emailErrors.any(
+            (e) => e.toString().toLowerCase().contains('already exists'),
+          );
+        }
+      }
+    }
+
+    return false;
   }
 
   void _logDioError(String action, DioException e) {

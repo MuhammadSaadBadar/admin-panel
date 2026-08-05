@@ -1,11 +1,12 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../core/routes/route_names.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/color_constants.dart';
-import '../../../core/widgets/app_bottom_nav_bar.dart';
+import '../../../core/routes/route_names.dart';
+import '../../../core/widgets/app_drawer.dart';
 import '../../../core/widgets/custom_appbar.dart';
+import '../controllers/doctor_list_controller.dart';
 import '../models/doctor.dart';
 
 class DoctorManagementScreen extends StatefulWidget {
@@ -17,73 +18,14 @@ class DoctorManagementScreen extends StatefulWidget {
 
 class _DoctorManagementScreenState extends State<DoctorManagementScreen>
     with SingleTickerProviderStateMixin {
+  // Used to reliably open/close the mobile drawer. Using a GlobalKey avoids
+  // the Scaffold.of(context) context-hierarchy problem (the AppBar is built
+  // with a context that is a *parent* of the returned Scaffold, so
+  // Scaffold.of fails to find it).
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-
-  // Doctor data
-  final List<Doctor> _doctors = [
-    Doctor(
-      id: 1,
-      name: 'Dr. Sana Khan',
-      email: 'sana.khan@example.com',
-      phone: '+1 555-0199',
-      specialization: 'Gynaecologist',
-      experience: '10 Years Experience',
-      profileImage:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuB-xx3wTD94ErlNvjqcA2C6tG0VGz1jTcymaSv2gZLV6U9r9GghNnrxRwKKmhNyXHveMuY0Hyb54_xAS8Mbt2-ZE5EMJgfMR9ts5R3pDssRiTFBSngeGseJyAw5TRXXNsnCDLSkGNwqxIfKH3fLkbC-mVJV8IPoVpTejqQcW0SwwmPYyPdKgOUrJLK-gsUdbL4aR587FFBILxI9OZ4RwiXcyGH0Znpij-i-NWnPjL4wSE8ZtzogaFr2',
-      isActive: true,
-      specialtyColor: Colors.pink,
-    ),
-    Doctor(
-      id: 2,
-      name: 'Dr. Arjun Mehta',
-      email: 'arjun.mehta@example.com',
-      phone: '+1 555-0200',
-      specialization: 'Pediatrician',
-      experience: '8 Years Experience',
-      profileImage:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuBorhh-b7ZkExMO4CkCmhoxcqxQxTd6kjtrOV4ADbk8E6cdJmKtPkMH8V7ilstQTBMBus6YMwlGfFCgJnByw-h1KH2F3c6DVooyCBYaWUihCQnrvoD2nPxlx_OBuewqxVqtGzu8dfayI1893ndnDXVtQLgFDNHSlM7f74hL-xG1TB4u BLE81AUTlW0ySvp4Tf2NUC4wliiaoz1wbT0IJrVBu3tzt1UFhpTI03wE9L3DXVVqsPg1dt3Z',
-      isActive: false,
-      specialtyColor: Colors.teal,
-    ),
-    Doctor(
-      id: 3,
-      name: 'Dr. Elena Vance',
-      email: 'elena.vance@example.com',
-      phone: '+1 555-0201',
-      specialization: 'Gynaecologist',
-      experience: '15 Years Experience',
-      profileImage:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuB0wyBVCbGGfqQrdXgr5wLqfQNoXEf9MYqfe8gsPcQChBK31KQISdFMXRyg9XWwCQy_2Osrl02qmYzA4Jl6zLBvaH8BfXkSr6eL-UYfTgFjCmkkrNQw6uGTgziLfObqJI_56AdVLYWY7HPq8JiFKSOqb1Rv0i4n-9EyUagxhqcPUAfYv6bjElx4qOALXdCnCjDcFO0J1cmOOsxN4D4wifmAa5h6YOPa7oj2_LwT2F9nzRJ4lv5WO7qb',
-      isActive: true,
-      specialtyColor: Colors.pink,
-    ),
-    Doctor(
-      id: 4,
-      name: 'Dr. Kevin Hart',
-      email: 'kevin.hart@example.com',
-      phone: '+1 555-0202',
-      specialization: 'Pediatrician',
-      experience: '3 Years Experience',
-      profileImage:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuDfCnSXVeDZeRPp8C42LRdNS-XFNIyllGxnqKJOxcpSFa3A4XTkqA8vMzKxEJtq46PXgHwO0D9f3HIkLb3Qs8njMgp-kSCFY4f3tt5yXd25rCDDeogn-7CcP_JfROHIFaIoUZBeJ63w1_8-QkbwYYCOiKgRRO62kX2v3ELKKHU569QJ3NLcTwSdW5z-ac2Y_mZHlfVydfUSFHKp44QdLw8NXmSLMsL9b56-RQhjwceBt6QdMqXzvPKJ',
-      isActive: false,
-      specialtyColor: Colors.teal,
-      isPending: true,
-    ),
-    Doctor(
-      id: 5,
-      name: 'Dr. Sarah Jenkins',
-      email: 'sarah.jenkins@example.com',
-      phone: '+1 555-0203',
-      specialization: 'Pediatrician',
-      experience: '12 Years Experience',
-      profileImage:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuD9DY6CqVRDyyqpqv4nBfs0GC20NS_9RnHTDefBLqMa0lc47PAWx8r8cRaoy3-Tol72AJx4RpR4ZHrc842lXHEuVNfyBjDG-g6nvr1qyWnj25ZtwdKBEyW8aj_fHuXvRJCXP8-mr94U7vLxfbaQV_DlscZXpKOdOqBJUh0P3Gc8UCwmpqQ-tFVaFKgadAffsUveme817tT8B5NNWA1oCOhRvu5-ekOjyDuj8nY8cWPvhlh3hVr5H69m',
-      isActive: true,
-      specialtyColor: Colors.teal,
-    ),
-  ];
 
   String _searchQuery = '';
   String _selectedFilter = 'All';
@@ -108,8 +50,8 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
     super.dispose();
   }
 
-  List<Doctor> get _filteredDoctors {
-    var filtered = _doctors;
+  List<Doctor> _filteredDoctors(List<Doctor> doctors) {
+    var filtered = doctors;
 
     // Apply search filter
     if (_searchQuery.isNotEmpty) {
@@ -145,6 +87,16 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
     final bool isMobile = MediaQuery.of(context).size.width < 768;
 
     return Scaffold(
+      key: _scaffoldKey,
+      drawer: isMobile
+          ? AppDrawer(
+              currentRoute: RouteNames.doctors,
+              onNavigate: (route) {
+                _scaffoldKey.currentState?.closeDrawer(); // close drawer
+                Get.toNamed(route);
+              },
+            )
+          : null,
       body: Row(
         children: [
           // Desktop Sidebar
@@ -164,7 +116,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
                         children: [
                           _buildSearchAndFilters(colorScheme),
                           const SizedBox(height: 24),
-                          _buildDoctorGrid(colorScheme),
+                          _buildDoctorContent(colorScheme),
                         ],
                       ),
                     ),
@@ -175,28 +127,117 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
           ),
         ],
       ),
-      floatingActionButton: _buildAddDoctorButton(colorScheme),
+      // floatingActionButton: _buildAddDoctorButton(colorScheme),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      bottomNavigationBar: isMobile
-          ? AppBottomNavBar(
-              selectedIndex: 1,
-              onItemSelected: (index) {
-                switch (index) {
-                  case 0:
-                    Get.toNamed(RouteNames.dashboard);
-                    break;
-                  case 1:
-                    break;
-                  case 2:
-                    Get.toNamed(RouteNames.patients);
-                    break;
-                  case 3:
-                    Get.toNamed(RouteNames.appointments);
-                    break;
-                }
-              },
-            )
-          : null,
+    );
+  }
+
+  // ── Doctor Content (loading / error / empty / list) ───────────────────
+  Widget _buildDoctorContent(ColorScheme colorScheme) {
+    // Use the controller registered in InitialBinding.
+    final controller = Get.find<DoctorListController>();
+
+    return Obx(() {
+      if (controller.isLoading.value) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 48),
+            child: CircularProgressIndicator(color: ColorConstants.primary),
+          ),
+        );
+      }
+
+      if (controller.error.value != null) {
+        return _buildErrorState(colorScheme, controller);
+      }
+
+      final filtered = _filteredDoctors(controller.doctors.toList());
+
+      if (filtered.isEmpty) {
+        return _buildEmptyState(colorScheme);
+      }
+
+      return _buildDoctorGrid(colorScheme, filtered);
+    });
+  }
+
+  Widget _buildErrorState(
+    ColorScheme colorScheme,
+    DoctorListController controller,
+  ) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 48),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, color: colorScheme.error, size: 48),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to load doctors',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              controller.error.value ?? 'An error occurred.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => controller.loadDoctors(),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(ColorScheme colorScheme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 48),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.person_search,
+              size: 56,
+              color: colorScheme.onSurfaceVariant.withOpacity(0.4),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No doctors found',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try adjusting your search or filters.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -341,6 +382,11 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
   Widget _buildTopAppBar(ColorScheme colorScheme, bool isMobile) {
     return CustomAppBar(
       title: 'Doctor Management',
+      showMenuButton: isMobile,
+      onMenuTap: () {
+        debugPrint('[DoctorDashboard] Menu tapped — opening drawer');
+        _scaffoldKey.currentState?.openDrawer();
+      },
       actions: [
         IconButton(
           onPressed: () {},
@@ -353,13 +399,9 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(color: colorScheme.primary.withOpacity(0.2)),
-            image: const DecorationImage(
-              image: NetworkImage(
-                'https://lh3.googleusercontent.com/aida-public/AB6AXuAWigYIPM6fob0PD0Ik78ijq-h-NQY5hCqVAVWbtHgS4Juv8FqO8yQrAFAEotP0jUj7qKr6dghsCcB1ngSbSkZTyXyUgLACUZ_dMWQVei5pj1zxqkyhcz5L_jLio0k_0qgyg_Aq9tgaIsOSSVo_C-YQQLu56zxoYPedKe2dHbRhPNwoVcWXgqD8a7gia2AA-XHa-Zqq-xeZs1U_u_S9-Dv6bmnrkFJGtPjU49NF-gQfOXNvnH6cnys_',
-              ),
-              fit: BoxFit.cover,
-            ),
+            color: colorScheme.surfaceContainerHigh,
           ),
+          child: Icon(Icons.person, color: colorScheme.primary, size: 18),
         ),
       ],
     );
@@ -413,10 +455,9 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          alignment: WrapAlignment.start, // Added this for proper alignment
-          crossAxisAlignment: WrapCrossAlignment.center, // Added this
+          alignment: WrapAlignment.start,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            // "Filters:" label - moved to separate container
             Padding(
               padding: const EdgeInsets.only(right: 4),
               child: Text(
@@ -440,7 +481,6 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
               _selectedFilter == 'Pediatrician',
               colorScheme,
             ),
-            // Filter icon button - wrapped in a container for proper alignment
             Container(
               width: 32,
               height: 32,
@@ -519,7 +559,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
     );
   }
 
-  Widget _buildDoctorGrid(ColorScheme colorScheme) {
+  Widget _buildDoctorGrid(ColorScheme colorScheme, List<Doctor> doctors) {
     final bool isMobile = MediaQuery.of(context).size.width < 600;
     final bool isTablet = MediaQuery.of(context).size.width < 900;
 
@@ -538,9 +578,9 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
         mainAxisSpacing: 24,
         childAspectRatio: 1.7,
       ),
-      itemCount: _filteredDoctors.length,
+      itemCount: doctors.length,
       itemBuilder: (context, index) {
-        return _buildDoctorCard(_filteredDoctors[index], colorScheme);
+        return _buildDoctorCard(doctors[index], colorScheme);
       },
     );
   }
@@ -550,8 +590,22 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
     final Color specialtyColor = doctor.specialtyColor;
 
     return GestureDetector(
-      onTap: () {
-        Get.toNamed(RouteNames.doctorDetail);
+      onTap: () async {
+        debugPrint(
+          '[DoctorDashboard] Navigating to doctor detail — id=${doctor.id}',
+        );
+        final listController = Get.find<DoctorListController>();
+        await Get.toNamed(
+          RouteNames.doctorDetail,
+          arguments: {'doctorId': doctor.id},
+        );
+        // The details screen may have changed the doctor's status. Refresh the
+        // list from the server so the dashboard always reflects the latest
+        // state when the user returns.
+        debugPrint(
+          '[DoctorDashboard] Returning from doctor detail — refreshing list',
+        );
+        await listController.refreshFromServer();
       },
       child: Container(
         padding: const EdgeInsets.all(24),
@@ -567,37 +621,17 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white.withOpacity(0.05)),
-                    color: isPending
-                        ? colorScheme.surfaceContainerHighest
-                        : Colors.transparent,
-                    image: DecorationImage(
-                      image: NetworkImage(doctor.profileImage ?? ''),
-                      fit: BoxFit.cover,
-                      colorFilter: isPending
-                          ? const ColorFilter.mode(
-                              Colors.grey,
-                              BlendMode.saturation,
-                            )
-                          : null,
-                    ),
-                  ),
-                ),
+                _buildAvatar(doctor, colorScheme, isPending),
                 const Spacer(),
                 Column(
                   children: [
-                    Row(
-                      children: [
-                        _buildIconButton(Icons.visibility, colorScheme),
-                        const SizedBox(width: 4),
-                        _buildIconButton(Icons.edit, colorScheme),
-                      ],
-                    ),
+                    // Row(
+                    //   children: [
+                    //     _buildIconButton(Icons.visibility, colorScheme),
+                    //     const SizedBox(width: 4),
+                    //     _buildIconButton(Icons.edit, colorScheme),
+                    //   ],
+                    // ),
                     if (isPending) ...[
                       const SizedBox(height: 8),
                       Container(
@@ -634,7 +668,9 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
               ),
             ),
             Text(
-              doctor.specialization,
+              doctor.specialization.isNotEmpty
+                  ? doctor.specialization
+                  : 'General',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
@@ -652,12 +688,17 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
                   color: colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: 6),
-                Text(
-                  doctor.experience,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: colorScheme.onSurfaceVariant,
+                Expanded(
+                  child: Text(
+                    doctor.experience.isNotEmpty
+                        ? doctor.experience
+                        : '${doctor.yearsOfExperience} years',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -703,25 +744,63 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
                         ),
                       ),
                       const SizedBox(width: 8),
-                      _buildToggleSwitch(doctor.isActive, colorScheme),
+                      _buildToggleSwitch(
+                        doctor,
+                        colorScheme,
+                        Get.find<DoctorListController>(),
+                      ),
                     ],
                   ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: Icon(
-                      Icons.block,
-                      color: colorScheme.error.withOpacity(0.6),
-                      size: 20,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 32,
-                      height: 32,
-                    ),
-                  ),
+                  // IconButton(
+                  //   onPressed: () {},
+                  //   icon: Icon(
+                  //     Icons.block,
+                  //     color: colorScheme.error.withOpacity(0.6),
+                  //     size: 20,
+                  //   ),
+                  //   padding: EdgeInsets.zero,
+                  //   constraints: const BoxConstraints.tightFor(
+                  //     width: 32,
+                  //     height: 32,
+                  //   ),
+                  // ),
                 ],
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvatar(Doctor doctor, ColorScheme colorScheme, bool isPending) {
+    final initials = doctor.name.isNotEmpty
+        ? doctor.name
+              .split(' ')
+              .where((w) => w.isNotEmpty)
+              .take(2)
+              .map((w) => w[0])
+              .join()
+              .toUpperCase()
+        : '?';
+
+    return Container(
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        color: isPending
+            ? colorScheme.surfaceContainerHighest
+            : colorScheme.primaryContainer.withOpacity(0.2),
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: colorScheme.primary,
+          ),
         ),
       ),
     );
@@ -740,32 +819,35 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
     );
   }
 
-  Widget _buildToggleSwitch(bool isActive, ColorScheme colorScheme) {
+  Widget _buildToggleSwitch(
+    Doctor doctor,
+    ColorScheme colorScheme,
+    DoctorListController controller,
+  ) {
     return GestureDetector(
       onTap: () {
-        setState(() {
-          // Find the doctor and toggle status
-          // For demo purposes, we'll just show a visual change
-        });
+        _confirmToggleActive(doctor, controller);
       },
       child: Container(
         width: 40,
         height: 20,
         padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
-          color: isActive
+          color: doctor.isActive
               ? colorScheme.primary
               : colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(16),
         ),
         child: AnimatedAlign(
           duration: const Duration(milliseconds: 300),
-          alignment: isActive ? Alignment.centerRight : Alignment.centerLeft,
+          alignment: doctor.isActive
+              ? Alignment.centerRight
+              : Alignment.centerLeft,
           child: Container(
             width: 16,
             height: 16,
             decoration: BoxDecoration(
-              color: isActive
+              color: doctor.isActive
                   ? Colors.white
                   : colorScheme.onSurfaceVariant.withOpacity(0.4),
               shape: BoxShape.circle,
@@ -776,24 +858,93 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
     );
   }
 
-  Widget _buildAddDoctorButton(ColorScheme colorScheme) {
-    return FloatingActionButton.extended(
-      onPressed: () {
-        Get.toNamed(RouteNames.doctorForm);
-      },
-      backgroundColor: colorScheme.primaryContainer,
-      foregroundColor: colorScheme.onPrimaryContainer,
-      icon: const Icon(Icons.add, size: 24),
-      label: Text(
-        'Add Doctor',
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
+  /// Shows a confirmation dialog before changing a doctor's active status,
+  /// then calls [DoctorListController.toggleActive].
+  void _confirmToggleActive(Doctor doctor, DoctorListController controller) {
+    final bool newState = !doctor.isActive;
+    final String action = newState ? 'activate' : 'deactivate';
+
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: ColorConstants.cardBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          '${newState ? 'Activate' : 'Deactivate'} Doctor',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: ColorConstants.onSurface,
+          ),
         ),
+        content: Text(
+          'Are you sure you want to $action ${doctor.name}? '
+          '${newState ? 'They will regain access to the platform.' : 'They will no longer be able to access the platform, but their history is preserved.'}',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 14,
+            color: ColorConstants.onSurfaceVariant,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: ColorConstants.onSurfaceVariant,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              debugPrint(
+                '[DoctorDashboard] Confirm toggle — id=${doctor.id} '
+                'isActive=$newState',
+              );
+              controller.toggleActive(doctor.id, newState);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: newState
+                  ? ColorConstants.success
+                  : ColorConstants.error,
+              foregroundColor: newState
+                  ? ColorConstants.background
+                  : ColorConstants.onError,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              newState ? 'Activate' : 'Deactivate',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     );
   }
-}
 
-// Data Model removed, imported from model file instead.
+  // Widget _buildAddDoctorButton(ColorScheme colorScheme) {
+  //   return FloatingActionButton.extended(
+  //     onPressed: () {
+  //       Get.toNamed(RouteNames.doctorForm);
+  //     },
+  //     backgroundColor: colorScheme.primaryContainer,
+  //     foregroundColor: colorScheme.onPrimaryContainer,
+  //     icon: const Icon(Icons.add, size: 24),
+  //     label: Text(
+  //       'Add Doctor',
+  //       style: GoogleFonts.plusJakartaSans(
+  //         fontSize: 14,
+  //         fontWeight: FontWeight.w700,
+  //       ),
+  //     ),
+  //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  //   );
+  // }
+}

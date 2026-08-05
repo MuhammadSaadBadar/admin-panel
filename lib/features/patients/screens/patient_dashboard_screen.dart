@@ -1,10 +1,10 @@
+import 'package:admin/core/widgets/app_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/color_constants.dart';
 import '../../../core/routes/route_names.dart';
-import '../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../core/widgets/custom_appbar.dart';
 import '../controllers/patient_list_controller.dart';
 import '../models/patient.dart';
@@ -20,7 +20,6 @@ class PatientManagementScreen extends StatefulWidget {
 
 class _PatientManagementScreenState extends State<PatientManagementScreen>
     with SingleTickerProviderStateMixin {
-  int _selectedNavIndex = 1; // Patient Management is selected
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
@@ -70,6 +69,15 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
 
     return Scaffold(
       backgroundColor: ColorConstants.scaffoldBackground,
+      drawer: isMobile
+          ? AppDrawer(
+              currentRoute: RouteNames.patients,
+              onNavigate: (route) {
+                Navigator.of(context).pop(); // close drawer
+                Get.toNamed(route);
+              },
+            )
+          : null,
       body: Row(
         children: [
           // Desktop Sidebar
@@ -125,26 +133,6 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
             )
           : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      bottomNavigationBar: isMobile
-          ? AppBottomNavBar(
-              selectedIndex: 2,
-              onItemSelected: (index) {
-                switch (index) {
-                  case 0:
-                    Get.toNamed(RouteNames.dashboard);
-                    break;
-                  case 1:
-                    Get.toNamed(RouteNames.doctors);
-                    break;
-                  case 2:
-                    break;
-                  case 3:
-                    Get.toNamed(RouteNames.appointments);
-                    break;
-                }
-              },
-            )
-          : null,
     );
   }
 
@@ -322,6 +310,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
   Widget _buildTopAppBar(bool isMobile) {
     return CustomAppBar(
       title: 'Patient Management',
+      showMenuButton: isMobile,
       actions: [
         if (!isMobile)
           Container(
@@ -399,7 +388,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
 
   Widget _buildFiltersSection() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: ColorConstants.cardBackground.withOpacity(0.7),
         borderRadius: BorderRadius.circular(12),
@@ -415,41 +404,62 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Expanded(flex: 2, child: _buildSearchField()),
-                    const SizedBox(width: 24),
+                    const SizedBox(width: 18),
                     Expanded(
                       flex: 1,
-                      child: _buildFilterDropdown('Trimester', [
-                        'All Trimesters',
-                        '1st Trimester',
-                        '2nd Trimester',
-                        '3rd Trimester',
-                      ]),
+                      child: Obx(
+                        () => _buildFilterDropdown(
+                          'Trimester',
+                          const [
+                            'All Trimesters',
+                            '1st Trimester',
+                            '2nd Trimester',
+                            '3rd Trimester',
+                          ],
+                          selectedValue: _trimesterLabel,
+                          onChanged: _onTrimesterChanged,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       flex: 1,
-                      child: _buildFilterDropdown('Risk Level', [
-                        'Any Risk',
-                        'High Risk',
-                        'Normal',
-                      ]),
+                      child: Obx(
+                        () => _buildFilterDropdown(
+                          'Risk Level',
+                          const ['Any Risk', 'High Risk', 'Normal'],
+                          selectedValue: _riskLevelLabel,
+                          onChanged: _onRiskLevelChanged,
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 13),
                     Expanded(
                       flex: 1,
-                      child: _buildFilterDropdown('Doctor', [
-                        'All Doctors',
-                        'Dr. Sarah Chen',
-                        'Dr. Michael Ross',
-                        'Dr. Elena Rodriguez',
-                      ]),
+                      child: Obx(
+                        () => _buildFilterDropdown(
+                          'Doctor',
+                          [
+                            'All Doctors',
+                            ..._controller.doctors.map((d) => d.name),
+                          ],
+                          selectedValue: _doctorLabel,
+                          onChanged: _onDoctorChanged,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 16),
                     ElevatedButton.icon(
-                      onPressed: () {},
+                      onPressed: _controller.hasActiveFilters
+                          ? () => _controller.clearFilters()
+                          : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: ColorConstants.primary,
-                        foregroundColor: ColorConstants.onPrimary,
+                        backgroundColor: ColorConstants.surfaceContainerHigh,
+                        foregroundColor: ColorConstants.primary,
+                        disabledBackgroundColor:
+                            ColorConstants.surfaceContainer,
+                        disabledForegroundColor: ColorConstants.onSurfaceVariant
+                            .withOpacity(0.4),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 24,
                           vertical: 14,
@@ -458,9 +468,9 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      icon: const Icon(Icons.filter_alt, size: 20),
+                      icon: const Icon(Icons.filter_alt_off, size: 20),
                       label: Text(
-                        'Apply Filters',
+                        'Clear Filters',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -477,20 +487,30 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                     Row(
                       children: [
                         Expanded(
-                          child: _buildFilterDropdown('Trimester', [
-                            'All Trimesters',
-                            '1st Trimester',
-                            '2nd Trimester',
-                            '3rd Trimester',
-                          ]),
+                          child: Obx(
+                            () => _buildFilterDropdown(
+                              'Trimester',
+                              const [
+                                'All Trimesters',
+                                '1st Trimester',
+                                '2nd Trimester',
+                                '3rd Trimester',
+                              ],
+                              selectedValue: _trimesterLabel,
+                              onChanged: _onTrimesterChanged,
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: _buildFilterDropdown('Risk Level', [
-                            'Any Risk',
-                            'High Risk',
-                            'Normal',
-                          ]),
+                          child: Obx(
+                            () => _buildFilterDropdown(
+                              'Risk Level',
+                              const ['Any Risk', 'High Risk', 'Normal'],
+                              selectedValue: _riskLevelLabel,
+                              onChanged: _onRiskLevelChanged,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -498,28 +518,41 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                     Row(
                       children: [
                         Expanded(
-                          child: _buildFilterDropdown('Doctor', [
-                            'All Doctors',
-                            'Dr. Sarah Chen',
-                            'Dr. Michael Ross',
-                            'Dr. Elena Rodriguez',
-                          ]),
+                          child: Obx(
+                            () => _buildFilterDropdown(
+                              'Doctor',
+                              [
+                                'All Doctors',
+                                ..._controller.doctors.map((d) => d.name),
+                              ],
+                              selectedValue: _doctorLabel,
+                              onChanged: _onDoctorChanged,
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: () {},
+                            onPressed: _controller.hasActiveFilters
+                                ? () => _controller.clearFilters()
+                                : null,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: ColorConstants.primary,
-                              foregroundColor: ColorConstants.onPrimary,
+                              backgroundColor:
+                                  ColorConstants.surfaceContainerHigh,
+                              foregroundColor: ColorConstants.primary,
+                              disabledBackgroundColor:
+                                  ColorConstants.surfaceContainer,
+                              disabledForegroundColor: ColorConstants
+                                  .onSurfaceVariant
+                                  .withOpacity(0.4),
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
                             ),
-                            icon: const Icon(Icons.filter_alt, size: 20),
+                            icon: const Icon(Icons.filter_alt_off, size: 20),
                             label: Text(
-                              'Apply',
+                              'Clear',
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
@@ -531,6 +564,66 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                     ),
                   ],
                 ),
+              const SizedBox(height: 8),
+              // Active-filter summary + result count (reactive)
+              Obx(() {
+                final total = _controller.filteredPatients.length;
+                final activeFilters = _controller.hasActiveFilters;
+                final search = _controller.searchQuery.value.trim();
+
+                if (!activeFilters) {
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Showing all patients',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: ColorConstants.onSurfaceVariant,
+                      ),
+                    ),
+                  );
+                }
+
+                final List<String> parts = [];
+                if (search.isNotEmpty) parts.add('Search: "$search"');
+                if (_controller.selectedTrimester.value != null) {
+                  parts.add('Trimester ${_controller.selectedTrimester.value}');
+                }
+                if (_controller.selectedRiskLevel.value.isNotEmpty) {
+                  parts.add('Risk: ${_controller.selectedRiskLevel.value}');
+                }
+                if (_controller.selectedDoctorId.value != null) {
+                  final doc = _controller.doctors
+                      .where((d) => d.id == _controller.selectedDoctorId.value)
+                      .firstOrNull;
+                  parts.add('Doctor: ${doc?.name ?? "Selected"}');
+                }
+
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Filters: ${parts.join(' • ')}',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: ColorConstants.primary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '$total shown',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: ColorConstants.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                );
+              }),
             ],
           );
         },
@@ -551,7 +644,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
             color: ColorConstants.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Container(
           decoration: BoxDecoration(
             color: ColorConstants.background,
@@ -569,8 +662,12 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
+                  onChanged: (value) {
+                    _controller.updateSearch(value);
+                    debugPrint('[PatientDashboard] Search input: "$value"');
+                  },
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14,
+                    fontSize: 12,
                     color: ColorConstants.onSurface,
                   ),
                   decoration: InputDecoration(
@@ -592,7 +689,21 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
     );
   }
 
-  Widget _buildFilterDropdown(String label, List<String> items) {
+  /// Builds a dropdown filter with a label and list of string items.
+  /// [selectedValue] is the currently selected item label (defaults to the
+  /// first item when null/empty), and [onChanged] is called with the newly
+  /// selected label.
+  Widget _buildFilterDropdown(
+    String label,
+    List<String> items, {
+    required String selectedValue,
+    required ValueChanged<String> onChanged,
+  }) {
+    final currentValue =
+        items.contains(selectedValue) && selectedValue.isNotEmpty
+        ? selectedValue
+        : items.first;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -605,32 +716,100 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
             color: ColorConstants.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Container(
           decoration: BoxDecoration(
             color: ColorConstants.background,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(6),
             border: Border.all(color: ColorConstants.borderWhite10),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
-              value: items.first,
+              value: currentValue,
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 14,
                 color: ColorConstants.onSurface,
               ),
               dropdownColor: ColorConstants.surfaceContainerHigh,
               isExpanded: true,
-              items: items.map((String item) {
-                return DropdownMenuItem<String>(value: item, child: Text(item));
-              }).toList(),
-              onChanged: (value) {},
+              items: items
+                  .map(
+                    (String item) => DropdownMenuItem<String>(
+                      value: item,
+                      child: Text(item),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) onChanged(value);
+              },
             ),
           ),
         ),
       ],
     );
+  }
+
+  // ── Filter label helpers ───────────────────────────────────────────────
+  String get _trimesterLabel {
+    switch (_controller.selectedTrimester.value) {
+      case 1:
+        return '1st Trimester';
+      case 2:
+        return '2nd Trimester';
+      case 3:
+        return '3rd Trimester';
+      default:
+        return 'All Trimesters';
+    }
+  }
+
+  String get _riskLevelLabel {
+    final risk = _controller.selectedRiskLevel.value;
+    return risk.isNotEmpty ? risk : 'Any Risk';
+  }
+
+  String get _doctorLabel {
+    final doctorId = _controller.selectedDoctorId.value;
+    if (doctorId == null) return 'All Doctors';
+    final doctor = _controller.doctors
+        .where((d) => d.id == doctorId)
+        .firstOrNull;
+    return doctor?.name ?? 'All Doctors';
+  }
+
+  void _onTrimesterChanged(String label) {
+    switch (label) {
+      case '1st Trimester':
+        _controller.setTrimester(1);
+      case '2nd Trimester':
+        _controller.setTrimester(2);
+      case '3rd Trimester':
+        _controller.setTrimester(3);
+      default:
+        _controller.setTrimester(null);
+    }
+  }
+
+  void _onRiskLevelChanged(String label) {
+    if (label == 'Any Risk') {
+      _controller.setRiskLevel('');
+    } else {
+      _controller.setRiskLevel(label);
+    }
+  }
+
+  void _onDoctorChanged(String label) {
+    if (label == 'All Doctors') {
+      _controller.setDoctor(null);
+    } else {
+      final doctor = _controller.doctors.firstWhere(
+        (d) => d.name == label,
+        orElse: () => _controller.doctors.first,
+      );
+      _controller.setDoctor(doctor.id);
+    }
   }
 
   Widget _buildPatientGrid() {
@@ -644,6 +823,13 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
         }
 
         return Obx(() {
+          final filtered = _controller.filteredPatients;
+          final hasSearch = _controller.searchQuery.value.trim().isNotEmpty;
+          debugPrint(
+            '[PatientDashboard] Grid — total=${_controller.patients.length} '
+            'filtered=${filtered.length} search="$hasSearch"',
+          );
+
           if (_controller.isLoading.value && _controller.patients.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -657,12 +843,42 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
             );
           }
 
-          if (_controller.patients.isEmpty) {
+          if (filtered.isEmpty) {
             return Center(
-              child: Text(
-                'No patients found.',
-                style: GoogleFonts.plusJakartaSans(
-                  color: ColorConstants.onSurfaceVariant,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 48),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.person_search,
+                      size: 56,
+                      color: ColorConstants.onSurfaceVariant.withOpacity(0.4),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      hasSearch
+                          ? 'No patients match your search.'
+                          : 'No patients found.',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: ColorConstants.onSurfaceVariant,
+                      ),
+                    ),
+                    if (hasSearch) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Try a different name, ID, or phone number.',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          color: ColorConstants.onSurfaceVariant.withOpacity(
+                            0.7,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             );
@@ -677,9 +893,9 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
               mainAxisSpacing: 24,
               childAspectRatio: 1.75,
             ),
-            itemCount: _controller.patients.length,
+            itemCount: filtered.length,
             itemBuilder: (context, index) {
-              return _buildPatientCard(_controller.patients[index]);
+              return _buildPatientCard(filtered[index]);
             },
           );
         });

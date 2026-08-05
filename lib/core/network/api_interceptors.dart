@@ -4,10 +4,47 @@ import 'package:get/get.dart' hide Response;
 
 import '../routes/route_names.dart';
 
-class AuthInterceptor extends Interceptor {
-  final String Function() getToken;
+/// Result of a successful token-refresh request. Kept in the network layer so
+/// the interceptor does not depend on feature-level auth models.
+class TokenRefreshResult {
+  final String accessToken;
+  final String? refreshToken;
 
-  AuthInterceptor({required this.getToken});
+  const TokenRefreshResult({required this.accessToken, this.refreshToken});
+}
+
+class AuthInterceptor extends Interceptor {
+  /// Marker placed in [RequestOptions.extra] to prevent a replayed request
+  /// from being refreshed (and retried) more than once.
+  static const String retriedFlag = 'auth_retried';
+
+  final String Function() getToken;
+  final String? Function() getRefreshToken;
+  final Future<TokenRefreshResult> Function(String refreshToken) refreshRequest;
+  final Future<void> Function(String accessToken, String? refreshToken)
+  onTokenRefreshed;
+  final Future<void> Function() onLogoutRequired;
+
+  Dio? _dio;
+  bool _isRefreshing = false;
+  final List<_PendingRequest> _pendingRequests = [];
+
+  AuthInterceptor({
+    required this.getToken,
+    required this.getRefreshToken,
+    required this.refreshRequest,
+    required this.onTokenRefreshed,
+    required this.onLogoutRequired,
+  });
+
+  /// Gives the interceptor a reference to the [Dio] instance it lives on, so
+  /// it can replay queued requests through the full interceptor chain (which
+  /// will attach the freshly-obtained token in [onRequest]).
+  void setDio(Dio dio) {
+    _dio = dio;
+  }
+
+  bool _isAuthEndpoint(String path) => path.contains('/auth/');
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
@@ -23,17 +60,150 @@ class AuthInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    if (err.response?.statusCode == 401) {
+    final request = err.requestOptions;
+    final status = err.response?.statusCode;
+
+    // Only trigger refresh for 401s on protected endpoints.
+    // Login/refresh/logout endpoints may legitimately return 401 and must
+    // never recurse into the refresh flow.
+    if (status != 401 || _isAuthEndpoint(request.path)) {
+      handler.next(err);
+      return;
+    }
+
+    debugPrint('[AUTH] 401 received for ${request.path} — attempting refresh.');
+
+    // If this exact request was already retried with a fresh token and still
+    // got a 401, the session is genuinely invalid — do not retry again.
+    if (request.extra[retriedFlag] == true) {
       debugPrint(
-        '[HTTP] AUTH 401 received for ${err.requestOptions.path} — '
-        'session is invalid or expired. Redirecting to login.',
+        '[AUTH] Request ${request.path} already retried after refresh — '
+        'session invalid. Failing request and logging out.',
       );
-      // Clear any pending navigation and force the user back to the login screen.
-      // The login controller will reset auth state on initialisation.
+      _failQueued();
+      _forceLogout();
+      handler.next(err);
+      return;
+    }
+
+    // Mark so the replayed request is refreshed at most once.
+    request.extra[retriedFlag] = true;
+
+    // Queue this request; it will be replayed once a fresh token is available.
+    _pendingRequests.add(
+      _PendingRequest(options: request, handler: handler, error: err),
+    );
+
+    // If a refresh is already in flight, this request simply waits. Only one
+    // refresh runs regardless of how many requests 401 simultaneously.
+    if (_isRefreshing) {
+      debugPrint(
+        '[AUTH] Refresh already in progress — queued ${request.path} '
+        '(${_pendingRequests.length} queued).',
+      );
+      return;
+    }
+
+    _refreshAndReplay();
+  }
+
+  Future<void> _refreshAndReplay() async {
+    final refreshToken = getRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      debugPrint('[AUTH] No refresh token available — cannot refresh session.');
+      _failQueued();
+      await _forceLogout();
+      return;
+    }
+
+    _isRefreshing = true;
+    debugPrint('[AUTH] Refreshing access token via /auth/token/refresh/ ...');
+
+    try {
+      final result = await refreshRequest(refreshToken);
+      debugPrint('[AUTH] Refresh request succeeded — access token updated.');
+
+      await onTokenRefreshed(result.accessToken, result.refreshToken);
+      debugPrint('[AUTH] New tokens persisted to storage.');
+
+      _isRefreshing = false;
+      _replayQueued();
+      debugPrint('[AUTH] All queued requests replayed with refreshed token.');
+    } catch (e) {
+      debugPrint('[AUTH] Refresh FAILED — reason: $e');
+      _isRefreshing = false;
+      _failQueued(refreshError: e);
+      await _forceLogout();
+    }
+  }
+
+  void _replayQueued() {
+    final dio = _dio;
+    final queue = List<_PendingRequest>.from(_pendingRequests);
+    _pendingRequests.clear();
+
+    for (final pending in queue) {
+      if (dio == null) {
+        pending.handler.reject(pending.error);
+        continue;
+      }
+      debugPrint(
+        '[AUTH] Replaying ${pending.options.path} with refreshed token.',
+      );
+      dio
+          .fetch(pending.options)
+          .then((response) => pending.handler.resolve(response))
+          .catchError((Object e) {
+            pending.handler.reject(
+              e is DioException
+                  ? e
+                  : DioException(requestOptions: pending.options, error: e),
+            );
+          });
+    }
+  }
+
+  void _failQueued({Object? refreshError}) {
+    final queue = List<_PendingRequest>.from(_pendingRequests);
+    _pendingRequests.clear();
+
+    for (final pending in queue) {
+      if (refreshError != null) {
+        pending.handler.reject(
+          DioException(requestOptions: pending.options, error: refreshError),
+        );
+      } else {
+        pending.handler.reject(pending.error);
+      }
+    }
+  }
+
+  Future<void> _forceLogout() async {
+    debugPrint('[AUTH] Logout triggered — refresh unsuccessful/not possible.');
+    try {
+      await onLogoutRequired();
+      debugPrint('[AUTH] Local auth state cleared.');
+    } catch (e) {
+      debugPrint('[AUTH] Logout cleanup failed: $e');
+    }
+
+    if (Get.currentRoute != RouteNames.login) {
+      debugPrint('[AUTH] Redirecting to /login.');
       Get.offAllNamed(RouteNames.login);
     }
-    handler.next(err);
   }
+}
+
+class _PendingRequest {
+  final RequestOptions options;
+  final ErrorInterceptorHandler handler;
+  final DioException error;
+
+  _PendingRequest({
+    required this.options,
+    required this.handler,
+    required this.error,
+  });
 }
 
 class LoggingInterceptor extends Interceptor {

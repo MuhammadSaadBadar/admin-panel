@@ -1,44 +1,56 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../core/routes/route_names.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/color_constants.dart';
+import '../../../core/routes/route_names.dart';
 import '../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../core/widgets/custom_appbar.dart';
+import '../controllers/doctor_invite_controller.dart';
+import '../repositories/doctor_repository.dart';
 
-class AddEditDoctorScreen extends StatefulWidget {
-  const AddEditDoctorScreen({super.key});
+/// Invite-a-doctor screen (replaces the old direct "create profile" form).
+///
+/// The backend does not allow admin-created doctor profiles. Instead, the
+/// admin sends an invitation (email + specialization) and the doctor completes
+/// their own profile via the emailed accept link. This screen collects exactly
+/// the two fields the `POST /accounts/doctors/invite/` endpoint accepts.
+class InviteDoctorScreen extends StatefulWidget {
+  const InviteDoctorScreen({super.key});
 
   @override
-  State<AddEditDoctorScreen> createState() => _AddEditDoctorScreenState();
+  State<InviteDoctorScreen> createState() => _InviteDoctorScreenState();
 }
 
-class _AddEditDoctorScreenState extends State<AddEditDoctorScreen>
+class _InviteDoctorScreenState extends State<InviteDoctorScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  late final DoctorInviteController _controller;
 
-  // Form controllers
-  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _qualificationController =
-      TextEditingController();
-  final TextEditingController _experienceController = TextEditingController();
-  final TextEditingController _feeController = TextEditingController();
-  final TextEditingController _hospitalController = TextEditingController();
-  final TextEditingController _languagesController = TextEditingController();
-
   String _selectedSpecialization = 'Obstetrics & Gynecology';
-  String _selectedStartTime = '09:00';
-  String _selectedEndTime = '17:00';
-  final List<String> _workingDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-  final List<String> _selectedDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+
+  static const List<String> _specializations = [
+    'Obstetrics & Gynecology',
+    'Pediatrics',
+    'General Practice',
+    'Internal Medicine',
+    'Cardiology',
+    'Dermatology',
+    'Nutrition & Dietetics',
+  ];
 
   @override
   void initState() {
     super.initState();
+    debugPrint('[InviteDoctorScreen] initState');
+
+    if (!Get.isRegistered<DoctorInviteController>()) {
+      Get.put(DoctorInviteController(Get.find<DoctorRepository>()));
+    }
+    _controller = Get.find<DoctorInviteController>();
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
@@ -52,15 +64,11 @@ class _AddEditDoctorScreenState extends State<AddEditDoctorScreen>
 
   @override
   void dispose() {
-    _nameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
-    _qualificationController.dispose();
-    _experienceController.dispose();
-    _feeController.dispose();
-    _hospitalController.dispose();
-    _languagesController.dispose();
     _animationController.dispose();
+    if (Get.isRegistered<DoctorInviteController>()) {
+      Get.delete<DoctorInviteController>();
+    }
     super.dispose();
   }
 
@@ -321,7 +329,7 @@ class _AddEditDoctorScreenState extends State<AddEditDoctorScreen>
               size: 16,
             ),
             Text(
-              'Add New Doctor',
+              'Invite Doctor',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -332,7 +340,7 @@ class _AddEditDoctorScreenState extends State<AddEditDoctorScreen>
         ),
         const SizedBox(height: 8),
         Text(
-          'Doctor Profile',
+          'Invite a Doctor',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 24,
             fontWeight: FontWeight.w700,
@@ -340,7 +348,8 @@ class _AddEditDoctorScreenState extends State<AddEditDoctorScreen>
           ),
         ),
         Text(
-          'Configure professional details for the clinical staff.',
+          'Send a secure invitation email. The doctor will use the emailed '
+          'link to set up their own account and profile.',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 14,
             fontWeight: FontWeight.w400,
@@ -352,27 +361,213 @@ class _AddEditDoctorScreenState extends State<AddEditDoctorScreen>
   }
 
   Widget _buildForm() {
-    return Column(
-      children: [
-        // Profile Photo Upload
-        _buildPhotoUpload(),
-        const SizedBox(height: 24),
-        // Basic Information
-        _buildBasicInfo(),
-        const SizedBox(height: 24),
-        // Professional Credentials
-        _buildCredentials(),
-        const SizedBox(height: 24),
-        // Availability & Languages
-        _buildAvailability(),
-        const SizedBox(height: 24),
-        // Form Actions
-        _buildFormActions(),
-      ],
+    return Obx(() {
+      // Top-level error banner (network failure, unexpected errors, fallback).
+      final topError = _controller.error.value;
+      final state = _controller.submissionState.value;
+      final showEmailDelay = _controller.showEmailDelayHint.value;
+      final alreadyPending = _controller.alreadyPending.value;
+
+      return Column(
+        children: [
+          if (topError != null && topError.isNotEmpty) ...[
+            _buildErrorBanner(
+              topError,
+              isUnknownOutcome: state == InviteSubmissionState.unknown,
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (state == InviteSubmissionState.unknown) ...[
+            _buildUnknownActions(),
+            const SizedBox(height: 16),
+          ],
+          if (showEmailDelay && !alreadyPending) ...[
+            _buildEmailDelayHint(),
+            const SizedBox(height: 16),
+          ],
+          if (alreadyPending) ...[
+            _buildAlreadyPendingBanner(),
+            const SizedBox(height: 16),
+          ],
+          // Invitation details
+          _buildInvitationCard(),
+          const SizedBox(height: 24),
+          // Form Actions
+          _buildFormActions(),
+        ],
+      );
+    });
+  }
+
+  /// Warning banner for the `unknown` outcome, with Check Status / Retry
+  /// actions so the user can recover instead of assuming a hard failure.
+  Widget _buildUnknownActions() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: ColorConstants.warning.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: ColorConstants.warning),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.help_outline, color: ColorConstants.warning, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'We couldn\'t confirm whether the invitation was sent. '
+                  'The server may have processed it. Please check status '
+                  'before retrying to avoid duplicates.',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: ColorConstants.onSurface,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _controller.isLoading.value
+                      ? null
+                      : _controller.verifyStatus,
+                  icon: const Icon(Icons.verified_outlined, size: 18),
+                  label: const Text('Check Status'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: ColorConstants.primary,
+                    side: BorderSide(color: ColorConstants.primary),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _controller.isLoading.value
+                      ? null
+                      : () => _controller.retry(),
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('Retry'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ColorConstants.primary,
+                    foregroundColor: ColorConstants.onPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildPhotoUpload() {
+  /// Info banner for the "already pending" outcome.
+  Widget _buildAlreadyPendingBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: ColorConstants.tertiaryContainer,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: ColorConstants.tertiary),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, color: ColorConstants.tertiary, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'An invitation is already pending for this email. '
+              'No duplicate invitation was created.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: ColorConstants.onSurface,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Hint that the invitation was created but email delivery may be delayed.
+  Widget _buildEmailDelayHint() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: ColorConstants.success.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: ColorConstants.success.withOpacity(0.4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.schedule, color: ColorConstants.success, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'The invitation was created. Email delivery may take a few '
+              'minutes — please also check the spam folder.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: ColorConstants.onSurface,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner(String message, {bool isUnknownOutcome = false}) {
+    final Color bannerColor = isUnknownOutcome
+        ? ColorConstants.warning
+        : ColorConstants.error;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bannerColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: bannerColor.withOpacity(0.4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            isUnknownOutcome ? Icons.help_outline : Icons.error_outline,
+            color: bannerColor,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: ColorConstants.onSurface,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInvitationCard() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -381,459 +576,139 @@ class _AddEditDoctorScreenState extends State<AddEditDoctorScreen>
         border: Border.all(color: ColorConstants.borderWhite10),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Photo upload area
-          Stack(
+          Row(
             children: [
-              Container(
-                width: 96,
-                height: 96,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
+              Icon(Icons.mail_outline, color: ColorConstants.primary, size: 22),
+              const SizedBox(width: 8),
+              Text(
+                'Invitation Details',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: ColorConstants.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Divider(
+            height: 1,
+            color: ColorConstants.onSurfaceVariant.withOpacity(0.3),
+          ),
+          const SizedBox(height: 16),
+          // Email field
+          Obx(
+            () => _buildFormField(
+              label: 'Email Address',
+              controller: _emailController,
+              hintText: 'doctor@clinic.com',
+              keyboardType: TextInputType.emailAddress,
+              errorText: _controller.fieldErrors['email'],
+              onChanged: (_) => _controller.clearFieldError('email'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Specialization dropdown
+          Obx(
+            () => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Specialization',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.05,
                     color: ColorConstants.onSurfaceVariant,
-                    width: 2,
-                    style: BorderStyle.solid,
-                  ),
-                  color: ColorConstants.surfaceContainer,
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.add_a_photo,
-                        color: ColorConstants.borderWhite10,
-                        size: 40,
-                      ),
-                    ],
                   ),
                 ),
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(6),
+                const SizedBox(height: 8),
+                Container(
                   decoration: BoxDecoration(
-                    color: ColorConstants.primaryContainer,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 8,
+                    color: ColorConstants.surfaceContainer,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color:
+                          _controller.fieldErrors.containsKey('specialization')
+                          ? ColorConstants.error
+                          : ColorConstants.borderWhite10,
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedSpecialization,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: ColorConstants.onSurface,
                       ),
-                    ],
+                      dropdownColor: ColorConstants.surfaceContainerHigh,
+                      isExpanded: true,
+                      items: _specializations.map((String item) {
+                        return DropdownMenuItem<String>(
+                          value: item,
+                          child: Text(item),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedSpecialization = value!;
+                        });
+                        _controller.clearFieldError('specialization');
+                      },
+                    ),
                   ),
-                  child: Icon(
-                    Icons.edit,
-                    color: ColorConstants.onPrimaryContainer,
-                    size: 18,
-                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Upload Photo',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: ColorConstants.onSurface,
-            ),
-          ),
-          Text(
-            'Recommended size: 500x500px',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: ColorConstants.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBasicInfo() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: ColorConstants.cardBackground.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ColorConstants.borderWhite10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Core Information',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: ColorConstants.primary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Divider(
-            height: 1,
-            color: ColorConstants.onSurfaceVariant.withOpacity(0.3),
-          ),
-          const SizedBox(height: 16),
-          // Full Name
-          _buildFormField(
-            label: 'Full Name',
-            controller: _nameController,
-            hintText: 'Dr. Sarah Mitchell',
-          ),
-          const SizedBox(height: 12),
-          // Email
-          _buildFormField(
-            label: 'Email Address',
-            controller: _emailController,
-            hintText: 'sarah.m@mamahealth.pro',
-            keyboardType: TextInputType.emailAddress,
-          ),
-          const SizedBox(height: 12),
-          // Phone
-          _buildFormField(
-            label: 'Phone Number',
-            controller: _phoneController,
-            hintText: '+1 (555) 000-0000',
-            keyboardType: TextInputType.phone,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCredentials() {
-    final List<String> specializations = [
-      'Obstetrics & Gynecology',
-      'Pediatrics',
-      'General Practice',
-      'Internal Medicine',
-      'Cardiology',
-    ];
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: ColorConstants.cardBackground.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ColorConstants.borderWhite10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Credentials',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: ColorConstants.primary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Divider(
-            height: 1,
-            color: ColorConstants.onSurfaceVariant.withOpacity(0.3),
-          ),
-          const SizedBox(height: 16),
-          // Specialization Dropdown
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Specialization',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.05,
-                  color: ColorConstants.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: ColorConstants.surfaceContainer,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: ColorConstants.borderWhite10),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedSpecialization,
+                if (_controller.fieldErrors.containsKey('specialization')) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _controller.fieldErrors['specialization']!,
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                      color: ColorConstants.onSurface,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: ColorConstants.error,
                     ),
-                    dropdownColor: ColorConstants.surfaceContainerHigh,
-                    isExpanded: true,
-                    items: specializations.map((String item) {
-                      return DropdownMenuItem<String>(
-                        value: item,
-                        child: Text(item),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedSpecialization = value!;
-                      });
-                    },
                   ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Qualification
-          _buildFormField(
-            label: 'Qualification',
-            controller: _qualificationController,
-            hintText: 'MBBS, MD - Gynaecology',
-          ),
-          const SizedBox(height: 12),
-          // Experience & Fee
-          Row(
-            children: [
-              Expanded(
-                child: _buildFormField(
-                  label: 'Experience (Years)',
-                  controller: _experienceController,
-                  hintText: '10',
-                  keyboardType: TextInputType.number,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildFormField(
-                  label: 'Consultation Fee',
-                  controller: _feeController,
-                  hintText: '\$150',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Hospital
-          _buildFormField(
-            label: 'Hospital / Clinic Name',
-            controller: _hospitalController,
-            hintText: 'Mama Health Central Clinic',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAvailability() {
-    final List<String> allDays = [
-      'Mon',
-      'Tue',
-      'Wed',
-      'Thu',
-      'Fri',
-      'Sat',
-      'Sun',
-    ];
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: ColorConstants.cardBackground.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ColorConstants.borderWhite10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Availability',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: ColorConstants.primary,
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          Divider(
-            height: 1,
-            color: ColorConstants.onSurfaceVariant.withOpacity(0.3),
-          ),
           const SizedBox(height: 16),
-          // Working Days
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Working Days',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.05,
-                  color: ColorConstants.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: allDays.map((day) {
-                  final isSelected = _selectedDays.contains(day);
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        if (isSelected) {
-                          _selectedDays.remove(day);
-                        } else {
-                          _selectedDays.add(day);
-                        }
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? ColorConstants.secondaryContainer
-                            : ColorConstants.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isSelected
-                              ? ColorConstants.primary
-                              : ColorConstants.borderWhite10,
-                        ),
-                      ),
-                      child: Text(
-                        day,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: isSelected
-                              ? ColorConstants.onSecondaryContainer
-                              : ColorConstants.onSurface,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Start & End Time
-          Row(
-            children: [
-              Expanded(
-                child: _buildTimePicker('Start Time', _selectedStartTime, (
-                  time,
-                ) {
-                  setState(() {
-                    _selectedStartTime = time;
-                  });
-                }),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildTimePicker('End Time', _selectedEndTime, (time) {
-                  setState(() {
-                    _selectedEndTime = time;
-                  });
-                }),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Languages
-          _buildFormField(
-            label: 'Languages Spoken',
-            controller: _languagesController,
-            hintText: 'English, Spanish, French',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTimePicker(
-    String label,
-    String initialTime,
-    Function(String) onTimeSelected,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.05,
-            color: ColorConstants.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: () async {
-            final TimeOfDay? picked = await showTimePicker(
-              context: context,
-              initialTime: TimeOfDay(
-                hour: int.parse(initialTime.split(':')[0]),
-                minute: int.parse(initialTime.split(':')[1]),
-              ),
-              builder: (context, child) {
-                return Theme(
-                  data: Theme.of(context).copyWith(
-                    colorScheme: const ColorScheme.dark(
-                      primary: Color(0xFFFFB1C5),
-                      onPrimary: Color(0xFF65002F),
-                      surface: Color(0xFF1E1E1E),
-                      onSurface: Color(0xFFE5E2E1),
-                    ),
-                  ),
-                  child: child!,
-                );
-              },
-            );
-            if (picked != null) {
-              final String formattedTime =
-                  '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
-              onTimeSelected(formattedTime);
-            }
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          // Helper note
+          Container(
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: ColorConstants.surfaceContainer,
+              color: ColorConstants.secondaryContainer.withOpacity(0.15),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: ColorConstants.borderWhite10),
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  Icons.access_time,
+                  Icons.info_outline,
                   color: ColorConstants.onSurfaceVariant,
-                  size: 20,
+                  size: 18,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  initialTime,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    color: ColorConstants.onSurface,
+                Expanded(
+                  child: Text(
+                    'An invitation email will be sent to the doctor with a '
+                    'secure link to set up their account and profile.',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w400,
+                      color: ColorConstants.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -842,7 +717,8 @@ class _AddEditDoctorScreenState extends State<AddEditDoctorScreen>
     required TextEditingController controller,
     required String hintText,
     TextInputType? keyboardType,
-    bool obscureText = false,
+    String? errorText,
+    ValueChanged<String>? onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -861,12 +737,16 @@ class _AddEditDoctorScreenState extends State<AddEditDoctorScreen>
           decoration: BoxDecoration(
             color: ColorConstants.surfaceContainer,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: ColorConstants.borderWhite10),
+            border: Border.all(
+              color: errorText != null
+                  ? ColorConstants.error
+                  : ColorConstants.borderWhite10,
+            ),
           ),
           child: TextField(
             controller: controller,
-            obscureText: obscureText,
             keyboardType: keyboardType,
+            onChanged: onChanged,
             style: GoogleFonts.plusJakartaSans(
               fontSize: 14,
               fontWeight: FontWeight.w400,
@@ -888,80 +768,137 @@ class _AddEditDoctorScreenState extends State<AddEditDoctorScreen>
             ),
           ),
         ),
+        if (errorText != null && errorText.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            errorText,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: ColorConstants.error,
+            ),
+          ),
+        ],
       ],
     );
   }
 
   Widget _buildFormActions() {
-    return Column(
-      children: [
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () {
-              // Show success dialog
-              _showSuccessDialog();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ColorConstants.primaryContainer,
-              foregroundColor: ColorConstants.onPrimaryContainer,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+    return Obx(() {
+      final bool isLoading = _controller.isLoading.value;
+      return Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: isLoading ? null : _handleInvite,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ColorConstants.primary,
+                foregroundColor: ColorConstants.onPrimary,
+                disabledBackgroundColor: ColorConstants.primary.withOpacity(
+                  0.4,
+                ),
+                disabledForegroundColor: ColorConstants.onPrimary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 4,
+                shadowColor: ColorConstants.primary.withOpacity(0.3),
               ),
-              elevation: 4,
-              shadowColor: ColorConstants.primaryContainer.withOpacity(0.3),
+              child: isLoading
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: ColorConstants.onPrimary,
+                      ),
+                    )
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.send,
+                          size: 20,
+                          color: ColorConstants.onPrimary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Send Invitation',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: ColorConstants.onPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
             ),
-            child: Text(
-              'Save Doctor Profile',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                color: ColorConstants.onPrimaryContainer,
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: isLoading ? null : () => Navigator.pop(context),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: ColorConstants.borderWhite10,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                side: BorderSide(color: ColorConstants.borderWhite10),
+              ),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: ColorConstants.borderWhite10,
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            style: OutlinedButton.styleFrom(
-              foregroundColor: ColorConstants.borderWhite10,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              side: BorderSide(color: ColorConstants.borderWhite10),
-            ),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: ColorConstants.borderWhite10,
-              ),
-            ),
-          ),
-        ),
-      ],
+        ],
+      );
+    });
+  }
+
+  Future<void> _handleInvite() async {
+    debugPrint('[InviteDoctorScreen] Invite button tapped.');
+    final bool ok = await _controller.invite(
+      email: _emailController.text.trim(),
+      specialization: _selectedSpecialization,
     );
+
+    if (ok) {
+      debugPrint('[InviteDoctorScreen] Invitation sent successfully.');
+      _showSuccessDialog();
+    } else {
+      debugPrint(
+        '[InviteDoctorScreen] Invitation failed — '
+        'error="${_controller.error.value}"',
+      );
+    }
   }
 
   void _showSuccessDialog() {
+    final String email = _emailController.text.trim();
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: ColorConstants.cardBackground,
         title: Column(
           children: [
-            Icon(Icons.check_circle, color: ColorConstants.tertiary, size: 48),
+            Icon(
+              Icons.mark_email_read_outlined,
+              color: ColorConstants.tertiary,
+              size: 48,
+            ),
             const SizedBox(height: 12),
             Text(
-              'Saved Successfully!',
+              'Invitation Sent!',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
@@ -971,7 +908,9 @@ class _AddEditDoctorScreenState extends State<AddEditDoctorScreen>
           ],
         ),
         content: Text(
-          'Doctor profile has been saved successfully.',
+          'An invitation email has been sent to $email.\n\n'
+          'The doctor will use the secure link in the email to set up '
+          'their account.',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 14,
             fontWeight: FontWeight.w400,

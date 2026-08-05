@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/color_constants.dart';
 import '../../../core/routes/route_names.dart';
-import '../../../core/widgets/app_bottom_nav_bar.dart';
+import '../../../core/widgets/app_drawer.dart';
 import '../../../core/widgets/custom_appbar.dart';
 import '../controllers/dashboard_controller.dart';
 import '../models/dashboard_stats.dart';
@@ -22,25 +22,36 @@ class AdminDashboard extends StatefulWidget {
 class _AdminDashboardState extends State<AdminDashboard>
     with SingleTickerProviderStateMixin {
   late DashboardController _controller;
-  int _selectedIndex = 0;
   late AnimationController _animationController;
   final List<Map<String, dynamic>> _navItems = [
-    {'icon': Icons.dashboard, 'label': 'Dashboard', 'isActive': true},
+    {'icon': Icons.dashboard_rounded, 'label': 'Dashboard', 'isActive': true},
     {
-      'icon': Icons.medical_services,
+      'icon': Icons.medical_services_rounded,
       'label': 'Doctor Management',
       'isActive': false,
     },
-    {'icon': Icons.person, 'label': 'Patient Management', 'isActive': false},
-    {'icon': Icons.event, 'label': 'Appointments', 'isActive': false},
-    {'icon': Icons.notifications, 'label': 'Notifications', 'isActive': false},
     {
-      'icon': Icons.description,
+      'icon': Icons.people_alt_rounded,
+      'label': 'Patient Management',
+      'isActive': false,
+    },
+    {'icon': Icons.event_rounded, 'label': 'Appointments', 'isActive': false},
+    {
+      'icon': Icons.notifications_rounded,
+      'label': 'Notifications',
+      'isActive': false,
+    },
+    {
+      'icon': Icons.description_rounded,
       'label': 'Content Management',
       'isActive': false,
     },
-    {'icon': Icons.emergency, 'label': 'SOS Requests', 'isActive': false},
-    {'icon': Icons.settings, 'label': 'Settings', 'isActive': false},
+    {
+      'icon': Icons.emergency_rounded,
+      'label': 'SOS Requests',
+      'isActive': false,
+    },
+    {'icon': Icons.settings_rounded, 'label': 'Settings', 'isActive': false},
   ];
 
   @override
@@ -72,6 +83,16 @@ class _AdminDashboardState extends State<AdminDashboard>
 
     return Scaffold(
       backgroundColor: ColorConstants.scaffoldBackground,
+      // Mobile drawer (hamburger + swipe). Desktop keeps the inline sidebar.
+      drawer: isMobile
+          ? AppDrawer(
+              currentRoute: RouteNames.dashboard,
+              onNavigate: (route) {
+                Navigator.of(context).pop(); // close drawer
+                Get.toNamed(route);
+              },
+            )
+          : null,
       body: Row(
         children: [
           // Desktop Sidebar
@@ -80,7 +101,7 @@ class _AdminDashboardState extends State<AdminDashboard>
           Expanded(
             child: Column(
               children: [
-                _buildTopAppBar(),
+                _buildTopAppBar(isMobile),
                 Expanded(
                   child: Obx(() {
                     final stats = _controller.stats.value;
@@ -92,7 +113,12 @@ class _AdminDashboardState extends State<AdminDashboard>
                     );
 
                     if (isLoading && stats == null) {
-                      return const Center(child: CircularProgressIndicator());
+                      return Center(
+                        child: CircularProgressIndicator(
+                          color: ColorConstants.primary,
+                          strokeWidth: 3,
+                        ),
+                      );
                     }
 
                     if (error != null && stats == null) {
@@ -106,27 +132,36 @@ class _AdminDashboardState extends State<AdminDashboard>
                     }
 
                     if (stats == null) {
-                      return const Center(
-                        child: Text('No dashboard data available.'),
+                      return Center(
+                        child: Text(
+                          'No dashboard data available.',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: ColorConstants.onSurfaceVariant,
+                          ),
+                        ),
                       );
                     }
 
                     return RefreshIndicator(
                       onRefresh: _controller.refresh,
+                      color: ColorConstants.primary,
+                      backgroundColor: ColorConstants.cardBackground,
                       child: SingleChildScrollView(
                         // AlwaysScrollableScrollPhysics ensures the
                         // pull-to-refresh gesture fires even when the
                         // content fits within the viewport.
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(20),
                         child: FadeTransition(
                           opacity: _animationController,
                           child: Column(
                             children: [
                               StatsGrid(stats: stats),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 20),
                               ChartWidget(stats: stats),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 20),
                               _LowerSection(stats: stats),
                             ],
                           ),
@@ -140,29 +175,6 @@ class _AdminDashboardState extends State<AdminDashboard>
           ),
         ],
       ),
-      bottomNavigationBar: isMobile
-          ? AppBottomNavBar(
-              selectedIndex: _selectedIndex,
-              onItemSelected: (index) {
-                setState(() {
-                  _selectedIndex = index;
-                });
-                switch (index) {
-                  case 0:
-                    break;
-                  case 1:
-                    Get.toNamed(RouteNames.doctors);
-                    break;
-                  case 2:
-                    Get.toNamed(RouteNames.patients);
-                    break;
-                  case 3:
-                    Get.toNamed(RouteNames.appointments);
-                    break;
-                }
-              },
-            )
-          : null,
     );
   }
 
@@ -172,73 +184,82 @@ class _AdminDashboardState extends State<AdminDashboard>
       decoration: BoxDecoration(
         color: ColorConstants.surfaceContainerLow,
         border: Border(right: BorderSide(color: ColorConstants.borderWhite10)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 24,
+            offset: const Offset(6, 0),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Text(
-                  'Mama Health',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: ColorConstants.primary,
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        ColorConstants.primary,
+                        ColorConstants.primary.withOpacity(0.6),
+                      ],
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.favorite_rounded,
+                    color: Colors.white,
+                    size: 20,
                   ),
                 ),
-                Text(
-                  'Admin Panel',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.05,
-                    color: ColorConstants.onSurfaceVariant.withOpacity(0.7),
-                  ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Mama Health',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                        color: ColorConstants.primary,
+                      ),
+                    ),
+                    Text(
+                      'ADMIN PANEL',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.1,
+                        color: ColorConstants.onSurfaceVariant.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 40),
+          const SizedBox(height: 32),
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               itemCount: _navItems.length,
               itemBuilder: (context, index) {
                 final item = _navItems[index];
                 final isActive = item['isActive'] as bool;
                 return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      color: isActive
-                          ? ColorConstants.secondaryContainer
-                          : Colors.transparent,
-                    ),
-                    child: ListTile(
-                      leading: Icon(
-                        item['icon'] as IconData,
-                        color: isActive
-                            ? ColorConstants.onSecondaryContainer
-                            : ColorConstants.onSurfaceVariant,
-                        size: 24,
-                      ),
-                      title: Text(
-                        item['label'] as String,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                          color: isActive
-                              ? ColorConstants.onSecondaryContainer
-                              : ColorConstants.onSurfaceVariant,
-                        ),
-                      ),
-                      hoverColor: ColorConstants.surfaceVariant.withOpacity(
-                        0.5,
-                      ),
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
                       onTap: () {
                         setState(() {
                           for (int i = 0; i < _navItems.length; i++) {
@@ -246,31 +267,97 @@ class _AdminDashboardState extends State<AdminDashboard>
                           }
                         });
                       },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: isActive
+                              ? ColorConstants.secondaryContainer
+                              : Colors.transparent,
+                        ),
+                        child: Row(
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: 3,
+                              height: 20,
+                              margin: const EdgeInsets.only(right: 12),
+                              decoration: BoxDecoration(
+                                color: isActive
+                                    ? ColorConstants.primary
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            Icon(
+                              item['icon'] as IconData,
+                              color: isActive
+                                  ? ColorConstants.onSecondaryContainer
+                                  : ColorConstants.onSurfaceVariant,
+                              size: 21,
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Text(
+                                item['label'] as String,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13.5,
+                                  fontWeight: isActive
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: isActive
+                                      ? ColorConstants.onSecondaryContainer
+                                      : ColorConstants.onSurfaceVariant,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 );
               },
             ),
           ),
-          const Divider(height: 1, color: ColorConstants.borderWhite10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Divider(height: 1, color: ColorConstants.borderWhite10),
+          ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
                 color: ColorConstants.surfaceContainerHigh,
+                border: Border.all(color: ColorConstants.borderWhite10),
               ),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: ColorConstants.primary.withOpacity(0.2),
-                    backgroundImage: const NetworkImage(
-                      'https://lh3.googleusercontent.com/aida-public/AB6AXuAE6o_O4DxXcFSHNFjr8A8WXukC9PdVVVjGPCTDGne5McL4NRLnvC6uhqNP_7AZlwUD_tm6vvs93LOza9RZV6JyWFDCC9pw9kORSSHSEWmd0cy3P14lv7sHJFBGCbB77hB7952pzk4pmk3oZrt_cfI9TXwr99M_U77Osesr5cmXAfoGHoEo6TiQ8xcCiLtpqiz1c_dwVnyBWrVOG4HJhPAf4N4kkKl6wTi_AvVh5r42_-zCRg-WVtgN',
+                  Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: ColorConstants.primary.withOpacity(0.6),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: CircleAvatar(
+                      radius: 19,
+                      backgroundColor: ColorConstants.primary.withOpacity(0.2),
+                      backgroundImage: const NetworkImage(
+                        'https://lh3.googleusercontent.com/aida-public/AB6AXuAE6o_O4DxXcFSHNFjr8A8WXukC9PdVVVjGPCTDGne5McL4NRLnvC6uhqNP_7AZlwUD_tm6vvs93LOza9RZV6JyWFDCC9pw9kORSSHSEWmd0cy3P14lv7sHJFBGCbB77hB7952pzk4pmk3oZrt_cfI9TXwr99M_U77Osesr5cmXAfoGHoEo6TiQ8xcCiLtpqiz1c_dwVnyBWrVOG4HJhPAf4N4kkKl6wTi_AvVh5r42_-zCRg-WVtgN',
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -278,7 +365,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                         Text(
                           'Admin User',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 14,
+                            fontSize: 13.5,
                             fontWeight: FontWeight.w700,
                             color: ColorConstants.onSurface,
                           ),
@@ -287,7 +374,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                         Text(
                           'Mama Health',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
+                            fontSize: 11.5,
                             fontWeight: FontWeight.w600,
                             letterSpacing: 0.05,
                             color: ColorConstants.onSurfaceVariant,
@@ -296,6 +383,11 @@ class _AdminDashboardState extends State<AdminDashboard>
                         ),
                       ],
                     ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: ColorConstants.onSurfaceVariant.withOpacity(0.6),
                   ),
                 ],
               ),
@@ -307,39 +399,58 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  Widget _buildTopAppBar() {
+  Widget _buildTopAppBar(bool isMobile) {
     return CustomAppBar(
       title: 'Welcome Admin',
+      showMenuButton: isMobile,
       actions: [
-        IconButton(
-          onPressed: () {},
-          icon: Icon(Icons.search, color: ColorConstants.onSurfaceVariant),
-        ),
-        const SizedBox(width: 8),
+        _topBarIconButton(icon: Icons.search_rounded, onPressed: () {}),
+        const SizedBox(width: 10),
         Stack(
+          clipBehavior: Clip.none,
           children: [
-            IconButton(
+            _topBarIconButton(
+              icon: Icons.notifications_rounded,
               onPressed: () {},
-              icon: Icon(
-                Icons.notifications,
-                color: ColorConstants.onSurfaceVariant,
-              ),
             ),
             Positioned(
-              top: 8,
-              right: 8,
+              top: 6,
+              right: 6,
               child: Container(
-                width: 8,
-                height: 8,
+                width: 9,
+                height: 9,
                 decoration: BoxDecoration(
                   color: ColorConstants.primary,
                   shape: BoxShape.circle,
+                  border: Border.all(
+                    color: ColorConstants.surfaceContainerLow,
+                    width: 2,
+                  ),
                 ),
               ),
             ),
           ],
         ),
+        const SizedBox(width: 4),
       ],
+    );
+  }
+
+  Widget _topBarIconButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: ColorConstants.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: ColorConstants.borderWhite10),
+      ),
+      child: IconButton(
+        onPressed: onPressed,
+        icon: Icon(icon, color: ColorConstants.onSurfaceVariant, size: 20),
+        splashRadius: 20,
+      ),
     );
   }
 }
@@ -396,17 +507,25 @@ class _DashboardErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.error_outline,
-              size: 48,
-              color: ColorConstants.error,
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: ColorConstants.error.withOpacity(0.1),
+              ),
+              child: Icon(
+                Icons.error_outline_rounded,
+                size: 34,
+                color: ColorConstants.error,
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 18),
             Text(
               'Unable to load dashboard data',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 18,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
                 color: ColorConstants.onSurface,
               ),
               textAlign: TextAlign.center,
@@ -421,8 +540,30 @@ class _DashboardErrorState extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
-            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ColorConstants.primary,
+                foregroundColor: ColorConstants.onPrimary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 22,
+                  vertical: 14,
+                ),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: Text(
+                'Retry',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -440,24 +581,50 @@ class _QuickActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: ColorConstants.cardBackground,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: ColorConstants.borderWhite10),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Quick Actions',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: ColorConstants.onSurface,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: ColorConstants.primary.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(
+                  Icons.bolt_rounded,
+                  size: 17,
+                  color: ColorConstants.primary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Quick Actions',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
+                  color: ColorConstants.onSurface,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -466,11 +633,13 @@ class _QuickActions extends StatelessWidget {
                 backgroundColor: ColorConstants.primary,
                 foregroundColor: ColorConstants.onPrimary,
                 padding: const EdgeInsets.symmetric(vertical: 14),
+                elevation: 0,
+                shadowColor: Colors.transparent,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              icon: const Icon(Icons.add_circle, size: 20),
+              icon: const Icon(Icons.add_circle_rounded, size: 19),
               label: Text(
                 'Add Doctor',
                 style: GoogleFonts.plusJakartaSans(
@@ -480,7 +649,7 @@ class _QuickActions extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -492,10 +661,11 @@ class _QuickActions extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 side: BorderSide(
-                  color: ColorConstants.primary.withOpacity(0.4),
+                  color: ColorConstants.primary.withOpacity(0.35),
+                  width: 1.4,
                 ),
               ),
-              icon: const Icon(Icons.campaign, size: 20),
+              icon: const Icon(Icons.campaign_rounded, size: 19),
               label: Text(
                 'Broadcast Message',
                 style: GoogleFonts.plusJakartaSans(
@@ -505,7 +675,7 @@ class _QuickActions extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -519,7 +689,7 @@ class _QuickActions extends StatelessWidget {
                 side: const BorderSide(color: Colors.transparent),
                 backgroundColor: ColorConstants.surfaceContainerHighest,
               ),
-              icon: const Icon(Icons.file_download, size: 20),
+              icon: const Icon(Icons.file_download_rounded, size: 19),
               label: Text(
                 'Export Report',
                 style: GoogleFonts.plusJakartaSans(
@@ -541,16 +711,16 @@ class _SystemHealth extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: ColorConstants.cardBackground,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: ColorConstants.borderWhite10),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            ColorConstants.tertiary.withOpacity(0.1),
+            ColorConstants.tertiary.withOpacity(0.12),
             Colors.transparent,
           ],
         ),
@@ -558,16 +728,29 @@ class _SystemHealth extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'System Health',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.05,
-              color: ColorConstants.tertiary,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: ColorConstants.tertiary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'SYSTEM HEALTH',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: ColorConstants.tertiary,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -576,7 +759,7 @@ class _SystemHealth extends StatelessWidget {
                   'Response Time',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 14,
-                    fontWeight: FontWeight.w400,
+                    fontWeight: FontWeight.w500,
                     color: ColorConstants.onSurface,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -587,20 +770,20 @@ class _SystemHealth extends StatelessWidget {
                 '180ms',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 14,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w700,
                   color: ColorConstants.tertiary,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
               value: 0.92,
               backgroundColor: Colors.white.withOpacity(0.05),
               color: ColorConstants.tertiary,
-              minHeight: 6,
+              minHeight: 7,
             ),
           ),
         ],

@@ -194,6 +194,22 @@ class PatientRegistrationController extends GetxController {
 
       return true;
     } on ApiException catch (e) {
+      if (e is NetworkException) {
+        // By the time a NetworkException reaches here, the repository has
+        // already retried once and the retry ALSO failed at the network
+        // layer. The patient may or may not have been created server-side —
+        // give the user an honest message and suggest checking the list.
+        error.value =
+            'Could not confirm the registration due to a network problem. '
+            'Please check the patient list before retrying — the patient may '
+            'have been created.';
+        debugPrint(
+          '[PatientRegistrationController] Registration network failure after '
+          'retry — original message="$e"',
+        );
+        return false;
+      }
+
       error.value = e.message;
       debugPrint(
         '[PatientRegistrationController] Registration failed (ApiException) — '

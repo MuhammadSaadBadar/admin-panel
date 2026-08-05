@@ -12,7 +12,7 @@ class RouteNames {
   static const String doctorForm = '/doctors/form';
   static const String patients = '/patients';
   static const String registerPatient = '/patients/register';
-
+  static const String assignDoctor = '/doctors/assign';
   static const String patientDetail = '/patients/detail';
   static const String appointments = '/appointments';
   static const String appointmentDetail = '/appointments/detail';
@@ -20,4 +20,6 @@ class RouteNames {
   static const String reportDetail = '/reports/detail';
   static const String notifications = '/notifications';
   static const String settings = '/settings';
+  static const String profile = '/profile';
+  static const String profileChangePassword = '/profile/change-password';
 }

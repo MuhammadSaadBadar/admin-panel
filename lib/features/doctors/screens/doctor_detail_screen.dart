@@ -1,11 +1,13 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../core/routes/route_names.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/color_constants.dart';
-import '../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../core/widgets/custom_appbar.dart';
+import '../../appointments/models/appointment.dart';
+import '../../patients/models/patient.dart';
+import '../controllers/doctor_detail_controller.dart';
+import '../models/doctor.dart';
 
 class DoctorDetailsScreen extends StatefulWidget {
   const DoctorDetailsScreen({super.key});
@@ -19,9 +21,27 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
+  late final DoctorDetailController _controller;
+  int _doctorId = 0;
+
   @override
   void initState() {
     super.initState();
+
+    _controller = Get.find<DoctorDetailController>();
+
+    // Extract the doctor ID from navigation arguments.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = Get.arguments as Map<String, dynamic>?;
+      if (args != null && args['doctorId'] != null) {
+        _doctorId = args['doctorId'] as int;
+      }
+      debugPrint('[DoctorDetailsScreen] Received doctorId=$_doctorId');
+      if (_doctorId > 0) {
+        _controller.loadDoctor(_doctorId);
+      }
+    });
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
@@ -46,71 +66,70 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
     return Scaffold(
       backgroundColor: ColorConstants.scaffoldBackground,
       body: SafeArea(
-        child: Column(
+        child: Row(
           children: [
+            if (!isMobile) _buildSidebar(),
             Expanded(
-              child: Row(
+              child: Column(
                 children: [
-                  // Desktop Sidebar
-                  if (!isMobile) _buildSidebar(),
-                  // Main Content
+                  _buildTopAppBar(isMobile),
                   Expanded(
-                    child: Column(
-                      children: [
-                        _buildTopAppBar(isMobile),
-                        Expanded(
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              return SingleChildScrollView(
-                                padding: const EdgeInsets.all(24),
-                                child: FadeTransition(
-                                  opacity: _fadeAnimation,
-                                  child: Column(
-                                    children: [
-                                      _buildHeroProfile(),
-                                      const SizedBox(height: 24),
-                                      _buildSecondaryInfoGrid(isMobile),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
+                    child: Obx(() {
+                      if (_controller.isLoading.value) {
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: ColorConstants.primary,
                           ),
-                        ),
-                      ],
-                    ),
+                        );
+                      }
+
+                      if (_controller.error.value != null) {
+                        return _buildErrorState();
+                      }
+
+                      final doctor = _controller.doctor.value;
+                      if (doctor == null) {
+                        return _buildNoDoctorState();
+                      }
+
+                      return LayoutBuilder(
+                        builder: (context, constraints) {
+                          return SingleChildScrollView(
+                            padding: EdgeInsets.all(isMobile ? 16 : 24),
+                            child: FadeTransition(
+                              opacity: _fadeAnimation,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildHeroProfile(isMobile, doctor),
+                                  SizedBox(height: isMobile ? 16 : 24),
+                                  _buildContactCard(isMobile, doctor),
+                                  SizedBox(height: isMobile ? 16 : 24),
+                                  _buildQualificationCard(isMobile, doctor),
+                                  SizedBox(height: isMobile ? 16 : 24),
+                                  _buildBioCard(isMobile, doctor),
+                                  SizedBox(height: isMobile ? 16 : 24),
+                                  _buildAssignedPatientsSection(isMobile),
+                                  SizedBox(height: isMobile ? 16 : 24),
+                                  _buildAppointmentsSection(isMobile),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }),
                   ),
                 ],
               ),
             ),
-            // Action Bar
-            _buildActionBar(isMobile),
           ],
         ),
       ),
-      bottomNavigationBar: isMobile
-          ? AppBottomNavBar(
-              selectedIndex: 1,
-              onItemSelected: (index) {
-                switch (index) {
-                  case 0:
-                    Get.toNamed(RouteNames.dashboard);
-                    break;
-                  case 1:
-                    break;
-                  case 2:
-                    Get.toNamed(RouteNames.patients);
-                    break;
-                  case 3:
-                    Get.toNamed(RouteNames.appointments);
-                    break;
-                }
-              },
-            )
-          : null,
     );
   }
 
+  // ── Sidebar ─────────────────────────────────────────────────────────────
   Widget _buildSidebar() {
     final List<Map<String, dynamic>> navItems = [
       {'icon': Icons.dashboard, 'label': 'Dashboard', 'selected': false},
@@ -272,6 +291,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
     );
   }
 
+  // ── Top App Bar ─────────────────────────────────────────────────────────
   Widget _buildTopAppBar(bool isMobile) {
     return CustomAppBar(
       title: 'Doctor Details',
@@ -290,54 +310,101 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
     );
   }
 
-  Widget _buildHeroProfile() {
-    final bool isMobile = MediaQuery.of(context).size.width < 768;
+  // ── Error & Empty States ────────────────────────────────────────────────
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, color: ColorConstants.error, size: 56),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to load doctor details',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: ColorConstants.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _controller.error.value ?? 'An error occurred.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                color: ColorConstants.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                debugPrint('[DoctorDetailsScreen] Retry — doctorId=$_doctorId');
+                _controller.loadDoctor(_doctorId);
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ColorConstants.primary,
+                foregroundColor: ColorConstants.onPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoDoctorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.person_search,
+              size: 56,
+              color: ColorConstants.onSurfaceVariant.withOpacity(0.4),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No doctor selected',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: ColorConstants.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Please select a doctor from the list to view details.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                color: ColorConstants.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Hero Profile ────────────────────────────────────────────────────────
+  Widget _buildHeroProfile(bool isMobile, Doctor doctor) {
+    final initials = _getInitials(doctor.name);
+    final dateJoined = doctor.dateJoined != null
+        ? _formatDate(doctor.dateJoined!)
+        : 'N/A';
 
     if (isMobile) {
       return Column(
         children: [
-          // Profile Image - centered
           Stack(
             children: [
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      ColorConstants.primary.withOpacity(0.25),
-                      ColorConstants.secondary.withOpacity(0.25),
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: ColorConstants.primary.withOpacity(0.1),
-                      blurRadius: 20,
-                      spreadRadius: 5,
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: ColorConstants.surfaceContainerHigh,
-                    width: 3,
-                  ),
-                  image: const DecorationImage(
-                    image: NetworkImage(
-                      'https://lh3.googleusercontent.com/aida-public/AB6AXuBSLM_gvz7yTBfM4ixeqOqNt6yfbXGtEdGExAeZm6xbbaBcZNXLcweK_5iqm0qIr3AIynrTXuQeGnxIzflvzNLGQ5k4JMHDpeknr2st_gF_yU_JXMIFFn7kgkcKKBrhB57BewOztf6Vla89m3yItzkRSnNuAD64j6ghLZ5gGPnaX2gQS_4scVcCltH7GZjHLTYR-x5XfrMhdFbWV0z9_C2stbROgE3w2emtFx33PPG4wvwN78k1XgOz',
-                    ),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
+              _buildAvatar(96, initials),
               Positioned(
                 bottom: 4,
                 right: 4,
@@ -345,7 +412,9 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                   width: 24,
                   height: 24,
                   decoration: BoxDecoration(
-                    color: Colors.green.shade500,
+                    color: doctor.isActive
+                        ? ColorConstants.success
+                        : ColorConstants.error,
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: ColorConstants.background,
@@ -358,7 +427,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
           ),
           const SizedBox(height: 16),
           Text(
-            'Dr. Sarah Jenkins',
+            doctor.name,
             style: GoogleFonts.plusJakartaSans(
               fontSize: 24,
               fontWeight: FontWeight.w700,
@@ -368,7 +437,9 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
           ),
           const SizedBox(height: 4),
           Text(
-            'Senior Gynecologist & Obstetrician',
+            doctor.specialization.isNotEmpty
+                ? doctor.specialization
+                : 'General',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 14,
               fontWeight: FontWeight.w400,
@@ -382,254 +453,690 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
             spacing: 8,
             runSpacing: 8,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade500.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: Colors.green.shade500.withOpacity(0.2),
-                  ),
-                ),
-                child: Text(
-                  'ACTIVE',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.green.shade400,
-                  ),
-                ),
+              _buildStatusBadge(
+                'ID: #${doctor.id}',
+                ColorConstants.onSurfaceVariant,
+                false,
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: ColorConstants.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: ColorConstants.borderWhite5),
-                ),
-                child: Text(
-                  'ID: MH-9021',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: ColorConstants.onSurfaceVariant,
-                  ),
-                ),
+              _buildStatusBadge(
+                doctor.isActive ? 'ACTIVE' : 'INACTIVE',
+                doctor.isActive ? ColorConstants.success : ColorConstants.error,
+                true,
               ),
             ],
           ),
           const SizedBox(height: 16),
-          // Info Cards - Stacked vertically on mobile
-          _buildInfoCard(
-            icon: Icons.school,
-            iconColor: ColorConstants.primary,
-            iconBgColor: ColorConstants.primaryContainer.withOpacity(0.2),
-            title: 'Qualification',
-            subtitle: 'MBBS, MD - Obstetrics & Gynecology',
-            description: 'Johns Hopkins School of Medicine',
-          ),
-          const SizedBox(height: 12),
-          _buildInfoCard(
-            icon: Icons.work_history,
-            iconColor: ColorConstants.tertiary,
-            iconBgColor: ColorConstants.tertiaryContainer.withOpacity(0.2),
-            title: 'Experience',
-            subtitle: '12+ Years Clinical Practice',
-            description: 'Specialized in High-Risk Pregnancy',
-          ),
+          _buildToggleActiveButton(doctor),
         ],
       );
     }
 
-    // Desktop layout
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Profile Image Section
-        Expanded(
-          flex: 4,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: ColorConstants.cardBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ColorConstants.borderWhite10),
+      ),
+      child: Row(
+        children: [
+          Stack(
             children: [
-              Stack(
-                children: [
-                  Container(
-                    width: 192,
-                    height: 192,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          ColorConstants.primary.withOpacity(0.25),
-                          ColorConstants.secondary.withOpacity(0.25),
-                        ],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: ColorConstants.primary.withOpacity(0.1),
-                          blurRadius: 30,
-                          spreadRadius: 10,
-                        ),
-                      ],
+              _buildAvatar(128, initials),
+              Positioned(
+                bottom: 6,
+                right: 6,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: doctor.isActive
+                        ? ColorConstants.success
+                        : ColorConstants.error,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: ColorConstants.background,
+                      width: 4,
                     ),
                   ),
-                  Container(
-                    width: 192,
-                    height: 192,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: ColorConstants.surfaceContainerHigh,
-                        width: 4,
-                      ),
-                      image: const DecorationImage(
-                        image: NetworkImage(
-                          'https://lh3.googleusercontent.com/aida-public/AB6AXuBSLM_gvz7yTBfM4ixeqOqNt6yfbXGtEdGExAeZm6xbbaBcZNXLcweK_5iqm0qIr3AIynrTXuQeGnxIzflvzNLGQ5k4JMHDpeknr2st_gF_yU_JXMIFFn7kgkcKKBrhB57BewOztf6Vla89m3yItzkRSnNuAD64j6ghLZ5gGPnaX2gQS_4scVcCltH7GZjHLTYR-x5XfrMhdFbWV0z9_C2stbROgE3w2emtFx33PPG4wvwN78k1XgOz',
-                        ),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 8,
-                    right: 8,
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade500,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: ColorConstants.background,
-                          width: 4,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Dr. Sarah Jenkins',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w700,
-                  color: ColorConstants.onSurface,
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Senior Gynecologist & Obstetrician',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w400,
-                  color: ColorConstants.primary,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade500.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: Colors.green.shade500.withOpacity(0.2),
-                      ),
-                    ),
-                    child: Text(
-                      'ACTIVE',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.green.shade400,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: ColorConstants.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: ColorConstants.borderWhite5),
-                    ),
-                    child: Text(
-                      'ID: MH-9021',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: ColorConstants.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ],
           ),
-        ),
-        const SizedBox(width: 24),
-        Expanded(
-          flex: 8,
-          child: Row(
-            children: [
-              Expanded(
-                child: _buildInfoCard(
-                  icon: Icons.school,
-                  iconColor: ColorConstants.primary,
-                  iconBgColor: ColorConstants.primaryContainer.withOpacity(0.2),
-                  title: 'Qualification',
-                  subtitle: 'MBBS, MD - Obstetrics & Gynecology',
-                  description: 'Johns Hopkins School of Medicine',
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildInfoCard(
-                  icon: Icons.work_history,
-                  iconColor: ColorConstants.tertiary,
-                  iconBgColor: ColorConstants.tertiaryContainer.withOpacity(
-                    0.2,
+          const SizedBox(width: 24),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  doctor.name,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    color: ColorConstants.onSurface,
                   ),
-                  title: 'Experience',
-                  subtitle: '12+ Years Clinical Practice',
-                  description: 'Specialized in High-Risk Pregnancy',
                 ),
-              ),
-            ],
+                const SizedBox(height: 6),
+                Text(
+                  doctor.specialization.isNotEmpty
+                      ? doctor.specialization
+                      : 'General',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                    color: ColorConstants.primary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _buildStatusBadge(
+                      'ID: #${doctor.id}',
+                      ColorConstants.onSurfaceVariant,
+                      false,
+                    ),
+                    const SizedBox(width: 12),
+                    _buildStatusBadge(
+                      doctor.isActive ? 'ACTIVE' : 'INACTIVE',
+                      doctor.isActive
+                          ? ColorConstants.success
+                          : ColorConstants.error,
+                      true,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.event,
+                      size: 16,
+                      color: ColorConstants.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Joined: $dateJoined',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: ColorConstants.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildToggleActiveButton(doctor),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatar(double size, String initials) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            ColorConstants.primary.withOpacity(0.25),
+            ColorConstants.secondary.withOpacity(0.25),
+          ],
+        ),
+        border: Border.all(
+          color: ColorConstants.surfaceContainerHigh,
+          width: 3,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: size * 0.35,
+            fontWeight: FontWeight.w700,
+            color: ColorConstants.primary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(String label, Color color, bool isDot) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isDot) ...[
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Contact Card ────────────────────────────────────────────────────────
+  Widget _buildContactCard(bool isMobile, Doctor doctor) {
+    return _buildSectionCard(
+      isMobile: isMobile,
+      icon: Icons.contact_phone_outlined,
+      title: 'Contact Information',
+      children: [
+        _buildInfoRow(
+          Icons.email_outlined,
+          'Email',
+          doctor.email.isNotEmpty ? doctor.email : 'N/A',
+          isMobile,
+        ),
+        _buildInfoRow(
+          Icons.phone_outlined,
+          'Phone',
+          doctor.phoneNumber.isNotEmpty ? doctor.phoneNumber : 'N/A',
+          isMobile,
+        ),
+      ],
+    );
+  }
+
+  // ── Qualification Card ──────────────────────────────────────────────────
+  Widget _buildQualificationCard(bool isMobile, Doctor doctor) {
+    return _buildSectionCard(
+      isMobile: isMobile,
+      icon: Icons.school_outlined,
+      title: 'Professional Details',
+      children: [
+        _buildInfoRow(
+          Icons.workspace_premium_outlined,
+          'License Number',
+          doctor.licenseNumber.isNotEmpty ? doctor.licenseNumber : 'N/A',
+          isMobile,
+        ),
+        _buildInfoRow(
+          Icons.work_history_outlined,
+          'Experience',
+          doctor.yearsOfExperience > 0
+              ? '${doctor.yearsOfExperience} Years'
+              : 'N/A',
+          isMobile,
+        ),
+        _buildInfoRow(
+          Icons.person_add_alt_1,
+          'Accepting Patients',
+          doctor.isAcceptingPatients ? 'Yes' : 'No',
+          isMobile,
+        ),
+      ],
+    );
+  }
+
+  // ── Bio Card ────────────────────────────────────────────────────────────
+  Widget _buildBioCard(bool isMobile, Doctor doctor) {
+    return _buildSectionCard(
+      isMobile: isMobile,
+      icon: Icons.notes_outlined,
+      title: 'About',
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 8),
+          child: Text(
+            doctor.bio.isNotEmpty ? doctor.bio : 'No bio available.',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: isMobile ? 14 : 15,
+              fontWeight: FontWeight.w400,
+              height: 1.6,
+              color: ColorConstants.onSurfaceVariant,
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildInfoCard({
-    required IconData icon,
-    required Color iconColor,
-    required Color iconBgColor,
-    required String title,
-    required String subtitle,
-    required String description,
-  }) {
-    final bool isMobile = MediaQuery.of(context).size.width < 768;
+  // ── Toggle Active Button ────────────────────────────────────────────────
+  Widget _buildToggleActiveButton(Doctor doctor) {
+    return Obx(() {
+      if (_controller.isTogglingActive.value) {
+        return const SizedBox(
+          width: 32,
+          height: 32,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: ColorConstants.primary,
+          ),
+        );
+      }
 
+      final bool active = _controller.doctor.value?.isActive ?? doctor.isActive;
+      return ElevatedButton.icon(
+        onPressed: () => _confirmToggleActive(doctor),
+        icon: Icon(active ? Icons.block : Icons.check_circle_outline, size: 18),
+        label: Text(active ? 'Deactivate Doctor' : 'Activate Doctor'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: active
+              ? ColorConstants.error
+              : ColorConstants.success,
+          foregroundColor: active
+              ? ColorConstants.onError
+              : ColorConstants.background,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    });
+  }
+
+  void _confirmToggleActive(Doctor doctor) {
+    final bool newState = !(doctor.isActive);
+    final String action = newState ? 'activate' : 'deactivate';
+
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: ColorConstants.cardBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          '${newState ? 'Activate' : 'Deactivate'} Doctor',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: ColorConstants.onSurface,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to $action ${doctor.name}? '
+          '${newState ? 'They will regain access to the platform.' : 'They will no longer be able to access the platform, but their history is preserved.'}',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 14,
+            color: ColorConstants.onSurfaceVariant,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: ColorConstants.onSurfaceVariant,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              debugPrint(
+                '[DoctorDetails] Confirm toggle — id=${doctor.id} '
+                'isActive=$newState',
+              );
+              _controller.toggleActive(doctor.id, newState);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: newState
+                  ? ColorConstants.success
+                  : ColorConstants.error,
+              foregroundColor: newState
+                  ? ColorConstants.background
+                  : ColorConstants.onError,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              newState ? 'Activate' : 'Deactivate',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Assigned Patients Section ──────────────────────────────────────────
+  Widget _buildAssignedPatientsSection(bool isMobile) {
+    return _buildSectionCard(
+      isMobile: isMobile,
+      icon: Icons.groups_outlined,
+      title: 'Assigned Patients',
+      trailing: Obx(
+        () => Text(
+          '${_controller.assignedPatients.length}',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: ColorConstants.primary,
+          ),
+        ),
+      ),
+      children: [
+        Obx(() {
+          if (_controller.isLoadingPatients.value &&
+              _controller.assignedPatients.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: CircularProgressIndicator(color: ColorConstants.primary),
+              ),
+            );
+          }
+
+          if (_controller.patientsError.value != null &&
+              _controller.assignedPatients.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: ColorConstants.error,
+                    size: 32,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _controller.patientsError.value!,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      color: ColorConstants.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (_controller.assignedPatients.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                'No patients have been assigned to this doctor yet.',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  color: ColorConstants.onSurfaceVariant,
+                ),
+              ),
+            );
+          }
+
+          return Column(
+            children: _controller.assignedPatients
+                .map((patient) => _buildPatientRow(patient, isMobile))
+                .toList(),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildPatientRow(Patient patient, bool isMobile) {
     return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.all(isMobile ? 12 : 14),
+      decoration: BoxDecoration(
+        color: ColorConstants.surfaceContainerHigh.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: ColorConstants.borderWhite5),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: ColorConstants.surfaceContainerHighest,
+            ),
+            child: Center(
+              child: Text(
+                _getInitials(patient.name),
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: ColorConstants.primary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  patient.name,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: isMobile ? 14 : 15,
+                    fontWeight: FontWeight.w600,
+                    color: ColorConstants.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  patient.email.isNotEmpty ? patient.email : 'No email',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: ColorConstants.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          _buildStatusBadge(
+            patient.isActive ? 'ACTIVE' : 'INACTIVE',
+            patient.isActive ? ColorConstants.success : ColorConstants.error,
+            true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Appointments Section ───────────────────────────────────────────────
+  Widget _buildAppointmentsSection(bool isMobile) {
+    return _buildSectionCard(
+      isMobile: isMobile,
+      icon: Icons.event_note_outlined,
+      title: 'Appointments',
+      trailing: Obx(
+        () => Text(
+          '${_controller.appointments.length}',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: ColorConstants.primary,
+          ),
+        ),
+      ),
+      children: [
+        Obx(() {
+          if (_controller.isLoadingAppointments.value &&
+              _controller.appointments.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: CircularProgressIndicator(color: ColorConstants.primary),
+              ),
+            );
+          }
+
+          if (_controller.appointmentsError.value != null &&
+              _controller.appointments.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: ColorConstants.error,
+                    size: 32,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _controller.appointmentsError.value!,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      color: ColorConstants.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (_controller.appointments.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                'No appointments found for this doctor.',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  color: ColorConstants.onSurfaceVariant,
+                ),
+              ),
+            );
+          }
+
+          return Column(
+            children: _controller.appointments
+                .map(
+                  (appointment) => _buildAppointmentRow(appointment, isMobile),
+                )
+                .toList(),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildAppointmentRow(Appointment appointment, bool isMobile) {
+    final statusColor = _appointmentStatusColor(appointment.status);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.all(isMobile ? 12 : 14),
+      decoration: BoxDecoration(
+        color: ColorConstants.surfaceContainerHigh.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: ColorConstants.borderWhite5),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: ColorConstants.primaryContainer.withOpacity(0.2),
+            ),
+            child: Icon(Icons.event, size: 18, color: ColorConstants.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  appointment.patient.fullName,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: isMobile ? 14 : 15,
+                    fontWeight: FontWeight.w600,
+                    color: ColorConstants.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${appointment.appointmentType.displayLabel} • ${_formatDateTime(appointment.scheduledAt)}',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: ColorConstants.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          _buildStatusBadge(appointment.status.displayLabel, statusColor, true),
+        ],
+      ),
+    );
+  }
+
+  Color _appointmentStatusColor(AppointmentStatus status) {
+    switch (status) {
+      case AppointmentStatus.pending:
+        return Colors.orange.shade400;
+      case AppointmentStatus.confirmed:
+        return ColorConstants.tertiary;
+      case AppointmentStatus.completed:
+        return ColorConstants.success;
+      case AppointmentStatus.cancelled:
+        return ColorConstants.error;
+      case AppointmentStatus.noShow:
+        return ColorConstants.onSurfaceVariant;
+      case AppointmentStatus.unknown:
+        return ColorConstants.onSurfaceVariant;
+    }
+  }
+
+  String _formatDateTime(DateTime? date) {
+    if (date == null) return 'Not scheduled';
+    final local = date.toLocal();
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final h = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final ampm = local.hour < 12 ? 'AM' : 'PM';
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${months[local.month - 1]} ${local.day}, ${local.year} • '
+        '$h:$minute $ampm';
+  }
+
+  Widget _buildSectionCard({
+    required bool isMobile,
+    required IconData icon,
+    required String title,
+    required List<Widget> children,
+    Widget? trailing,
+  }) {
+    return Container(
+      width: double.infinity,
       padding: EdgeInsets.all(isMobile ? 16 : 24),
       decoration: BoxDecoration(
         color: ColorConstants.cardBackground,
@@ -644,973 +1151,77 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: iconBgColor,
+                  color: ColorConstants.primaryContainer.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, color: iconColor, size: isMobile ? 20 : 24),
+                child: Icon(
+                  icon,
+                  color: ColorConstants.primary,
+                  size: isMobile ? 20 : 24,
+                ),
               ),
               const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: isMobile ? 16 : 20,
-                    fontWeight: FontWeight.w600,
-                    color: ColorConstants.onSurface,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+              Text(
+                title,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: isMobile ? 18 : 20,
+                  fontWeight: FontWeight.w600,
+                  color: ColorConstants.onSurface,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            subtitle,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: isMobile ? 13 : 14,
-              fontWeight: FontWeight.w500,
-              color: ColorConstants.onSurface,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            description,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: isMobile ? 13 : 14,
-              fontWeight: FontWeight.w400,
-              color: ColorConstants.onSurfaceVariant,
-            ),
-          ),
+          SizedBox(height: isMobile ? 16 : 20),
+          ...children,
         ],
       ),
     );
   }
 
-  Widget _buildSecondaryInfoGrid(bool isMobile) {
-    if (isMobile) {
-      return Column(
+  Widget _buildInfoRow(
+    IconData icon,
+    String label,
+    String value,
+    bool isMobile,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Patient Summary Card
           Container(
-            padding: const EdgeInsets.all(20),
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
-              color: ColorConstants.cardBackground,
-              borderRadius: BorderRadius.circular(12),
-              border: Border(
-                left: BorderSide(color: ColorConstants.primary, width: 4),
-              ),
+              color: ColorConstants.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(8),
             ),
+            child: Icon(icon, color: ColorConstants.tertiary, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Assigned Patients',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.05,
-                        color: ColorConstants.onSurfaceVariant,
-                      ),
-                    ),
-                    Icon(Icons.groups, color: ColorConstants.primary, size: 24),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      '142',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w700,
-                        color: ColorConstants.onSurface,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '+12% from last month',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.green.shade400,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TextButton.icon(
-                  onPressed: () {},
-                  icon: Icon(
-                    Icons.arrow_forward,
-                    color: ColorConstants.primary,
-                    size: 16,
-                  ),
-                  label: Text(
-                    'View All Patient Records',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: ColorConstants.primary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Weekly Availability Card
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: ColorConstants.cardBackground,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: ColorConstants.borderWhite10),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.calendar_today,
-                          color: ColorConstants.tertiary,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Weekly Availability',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: ColorConstants.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
-                    OutlinedButton(
-                      onPressed: () {},
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: ColorConstants.onSurfaceVariant,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        side: BorderSide(color: ColorConstants.borderWhite10),
-                      ),
-                      child: Text(
-                        'Update',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildDaySchedule('MON', '09:00 - 17:00'),
-                      _buildDaySchedule('TUE', '09:00 - 17:00'),
-                      _buildDaySchedule('WED', '09:00 - 17:00'),
-                      _buildDaySchedule('THU', '09:00 - 17:00'),
-                      _buildDaySchedule('FRI', '09:00 - 13:00'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Upcoming Appointments
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: ColorConstants.cardBackground,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: ColorConstants.borderWhite10),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.event_note,
-                          color: ColorConstants.secondary,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Upcoming Appointments',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: ColorConstants.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: ColorConstants.surfaceContainer,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: ColorConstants.borderWhite5),
-                      ),
-                      child: Icon(
-                        Icons.filter_list,
-                        color: ColorConstants.onSurfaceVariant,
-                        size: 20,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minWidth: MediaQuery.of(context).size.width - 88,
-                    ),
-                    child: DataTable(
-                      columnSpacing: 16,
-                      headingRowHeight: 40,
-                      dataRowMinHeight: 60,
-                      dataRowMaxHeight: 70,
-                      headingRowColor: WidgetStateProperty.all(
-                        ColorConstants.surfaceContainerLow,
-                      ),
-                      headingTextStyle: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.05,
-                        color: ColorConstants.onSurfaceVariant,
-                      ),
-                      dataTextStyle: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                        color: ColorConstants.onSurface,
-                      ),
-                      columns: const [
-                        DataColumn(label: Text('Patient')),
-                        DataColumn(label: Text('Date & Time')),
-                        DataColumn(label: Text('Type')),
-                        DataColumn(label: Text('Status')),
-                        DataColumn(label: Text(''), numeric: true),
-                      ],
-                      rows: [
-                        DataRow(
-                          cells: [
-                            DataCell(
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 32,
-                                    height: 32,
-                                    decoration: BoxDecoration(
-                                      color: ColorConstants.secondary
-                                          .withOpacity(0.2),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        'EM',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: ColorConstants.secondary,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Elena M.',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const DataCell(
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text('Today, Oct 24'),
-                                  Text(
-                                    '14:30 PM',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: ColorConstants.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            DataCell(
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: ColorConstants.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                    color: ColorConstants.borderWhite5,
-                                  ),
-                                ),
-                                child: Text(
-                                  'In-Person',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            DataCell(
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: ColorConstants.secondary,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Confirmed',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w400,
-                                      color: ColorConstants.secondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            DataCell(
-                              Icon(
-                                Icons.more_vert,
-                                color: ColorConstants.onSurfaceVariant,
-                                size: 20,
-                              ),
-                            ),
-                          ],
-                        ),
-                        DataRow(
-                          cells: [
-                            DataCell(
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 32,
-                                    height: 32,
-                                    decoration: BoxDecoration(
-                                      color: ColorConstants.primary.withOpacity(
-                                        0.2,
-                                      ),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        'JW',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: ColorConstants.primary,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Jessica W.',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const DataCell(
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text('Tomorrow'),
-                                  Text(
-                                    '10:00 AM',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: ColorConstants.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            DataCell(
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: ColorConstants.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                    color: ColorConstants.borderWhite5,
-                                  ),
-                                ),
-                                child: Text(
-                                  'Telehealth',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            DataCell(
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: ColorConstants.borderWhite10,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Pending',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w400,
-                                      color: ColorConstants.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            DataCell(
-                              Icon(
-                                Icons.more_vert,
-                                color: ColorConstants.onSurfaceVariant,
-                                size: 20,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-
-    // Desktop layout
-    return Column(
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Patient Summary Card
-            Expanded(
-              flex: 3,
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: ColorConstants.cardBackground,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border(
-                    left: BorderSide(color: ColorConstants.primary, width: 4),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Assigned Patients',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.05,
-                                color: ColorConstants.onSurfaceVariant,
-                              ),
-                            ),
-                            Icon(
-                              Icons.groups,
-                              color: ColorConstants.primary,
-                              size: 24,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Text(
-                              '142',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 36,
-                                fontWeight: FontWeight.w700,
-                                color: ColorConstants.onSurface,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '+12% from last month',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.green.shade400,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-                    TextButton.icon(
-                      onPressed: () {},
-                      icon: Icon(
-                        Icons.arrow_forward,
-                        color: ColorConstants.primary,
-                        size: 16,
-                      ),
-                      label: Text(
-                        'View All Patient Records',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: ColorConstants.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 24),
-            // Weekly Availability Card
-            Expanded(
-              flex: 7,
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: ColorConstants.cardBackground,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: ColorConstants.borderWhite10),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.calendar_today,
-                              color: ColorConstants.tertiary,
-                              size: 24,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Weekly Availability',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w600,
-                                color: ColorConstants.onSurface,
-                              ),
-                            ),
-                          ],
-                        ),
-                        OutlinedButton(
-                          onPressed: () {},
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: ColorConstants.onSurfaceVariant,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 4,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                            side: BorderSide(
-                              color: ColorConstants.borderWhite10,
-                            ),
-                          ),
-                          child: Text(
-                            'Update Hours',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        _buildDaySchedule('MON', '09:00 - 17:00'),
-                        _buildDaySchedule('TUE', '09:00 - 17:00'),
-                        _buildDaySchedule('WED', '09:00 - 17:00'),
-                        _buildDaySchedule('THU', '09:00 - 17:00'),
-                        _buildDaySchedule('FRI', '09:00 - 13:00'),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        // Upcoming Appointments
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: ColorConstants.cardBackground,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: ColorConstants.borderWhite10),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.event_note,
-                        color: ColorConstants.secondary,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Upcoming Appointments',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: ColorConstants.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: ColorConstants.surfaceContainer,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: ColorConstants.borderWhite5),
-                    ),
-                    child: Icon(
-                      Icons.filter_list,
-                      color: ColorConstants.onSurfaceVariant,
-                      size: 20,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  columnSpacing: 32,
-                  headingRowColor: WidgetStateProperty.all(
-                    ColorConstants.surfaceContainerLow,
-                  ),
-                  headingTextStyle: GoogleFonts.plusJakartaSans(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
+                Text(
+                  label.toUpperCase(),
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: isMobile ? 10 : 11,
+                    fontWeight: FontWeight.w600,
                     letterSpacing: 0.05,
                     color: ColorConstants.onSurfaceVariant,
                   ),
-                  dataTextStyle: GoogleFonts.plusJakartaSans(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: isMobile ? 14 : 15,
+                    fontWeight: FontWeight.w600,
                     color: ColorConstants.onSurface,
                   ),
-                  columns: const [
-                    DataColumn(label: Text('Patient Name')),
-                    DataColumn(label: Text('Date & Time')),
-                    DataColumn(label: Text('Consultation Type')),
-                    DataColumn(label: Text('Status')),
-                    DataColumn(label: Text('Action'), numeric: true),
-                  ],
-                  rows: [
-                    DataRow(
-                      cells: [
-                        DataCell(
-                          Row(
-                            children: [
-                              Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: ColorConstants.secondary.withOpacity(
-                                    0.2,
-                                  ),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    'EM',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: ColorConstants.secondary,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Text('Elena Martinez'),
-                            ],
-                          ),
-                        ),
-                        const DataCell(
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Today, Oct 24'),
-                              Text(
-                                '14:30 PM',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: ColorConstants.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        DataCell(
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: ColorConstants.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(
-                                color: ColorConstants.borderWhite5,
-                              ),
-                            ),
-                            child: Text(
-                              'In-Person',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: ColorConstants.secondary,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Confirmed',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w400,
-                                  color: ColorConstants.secondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        DataCell(
-                          Icon(
-                            Icons.more_vert,
-                            color: ColorConstants.onSurfaceVariant,
-                            size: 20,
-                          ),
-                        ),
-                      ],
-                    ),
-                    DataRow(
-                      cells: [
-                        DataCell(
-                          Row(
-                            children: [
-                              Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: ColorConstants.primary.withOpacity(
-                                    0.2,
-                                  ),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    'JW',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: ColorConstants.primary,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Text('Jessica Wright'),
-                            ],
-                          ),
-                        ),
-                        const DataCell(
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Tomorrow, Oct 25'),
-                              Text(
-                                '10:00 AM',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: ColorConstants.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        DataCell(
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: ColorConstants.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(
-                                color: ColorConstants.borderWhite5,
-                              ),
-                            ),
-                            child: Text(
-                              'Telehealth',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: ColorConstants.borderWhite10,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Pending',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w400,
-                                  color: ColorConstants.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        DataCell(
-                          Icon(
-                            Icons.more_vert,
-                            color: ColorConstants.onSurfaceVariant,
-                            size: 20,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
                 ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDaySchedule(String day, String time) {
-    final bool isMobile = MediaQuery.of(context).size.width < 768;
-
-    return Container(
-      width: isMobile ? 80 : null,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: ColorConstants.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: ColorConstants.borderWhite5),
-      ),
-      child: Column(
-        children: [
-          Text(
-            day,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: ColorConstants.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            time,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-              color: ColorConstants.tertiary,
+              ],
             ),
           ),
         ],
@@ -1618,184 +1229,33 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
     );
   }
 
-  Widget _buildActionBar(bool isMobile) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : 24,
-        vertical: isMobile ? 12 : 16,
-      ),
-      decoration: BoxDecoration(
-        color: ColorConstants.surfaceContainerHigh.withOpacity(0.9),
-        border: Border(top: BorderSide(color: ColorConstants.borderWhite10)),
-      ),
-      child: isMobile
-          ? Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: ColorConstants.primary,
-                          foregroundColor: ColorConstants.onPrimary,
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        icon: const Icon(Icons.edit, size: 16),
-                        label: Text(
-                          'Edit',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {},
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: ColorConstants.error,
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          side: BorderSide(color: ColorConstants.error),
-                        ),
-                        icon: const Icon(Icons.block, size: 16),
-                        label: Text(
-                          'Disable',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: ColorConstants.error.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: ColorConstants.error.withOpacity(0.5),
-                        ),
-                      ),
-                      child: IconButton(
-                        onPressed: () {},
-                        icon: Icon(
-                          Icons.delete,
-                          color: ColorConstants.error,
-                          size: 20,
-                        ),
-                        padding: const EdgeInsets.all(10),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Last modified by Admin on Oct 20, 2023',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10,
-                    fontStyle: FontStyle.italic,
-                    color: ColorConstants.onSurfaceVariant,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            )
-          : Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'Last modified by Admin on Oct 20, 2023',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                      color: ColorConstants.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 3,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {},
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: ColorConstants.primary,
-                            foregroundColor: ColorConstants.onPrimary,
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          icon: const Icon(Icons.edit, size: 16),
-                          label: Text(
-                            'Edit Profile',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {},
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: ColorConstants.error,
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            side: BorderSide(color: ColorConstants.error),
-                          ),
-                          icon: const Icon(Icons.block, size: 16),
-                          label: Text(
-                            'Disable',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: ColorConstants.error.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: ColorConstants.error.withOpacity(0.5),
-                          ),
-                        ),
-                        child: IconButton(
-                          onPressed: () {},
-                          icon: Icon(
-                            Icons.delete,
-                            color: ColorConstants.error,
-                            size: 20,
-                          ),
-                          padding: const EdgeInsets.all(10),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-    );
+  // ── Helpers ─────────────────────────────────────────────────────────────
+  String _getInitials(String name) {
+    if (name.isEmpty) return '?';
+    final parts = name
+        .trim()
+        .split(' ')
+        .where((w) => w.isNotEmpty)
+        .take(2)
+        .toList();
+    return parts.map((w) => w[0].toUpperCase()).join();
+  }
+
+  String _formatDate(DateTime date) {
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 }

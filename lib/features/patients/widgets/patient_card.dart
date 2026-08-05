@@ -8,4 +8,3 @@ class PatientCard extends StatelessWidget {
     return const Placeholder();
   }
 }
-

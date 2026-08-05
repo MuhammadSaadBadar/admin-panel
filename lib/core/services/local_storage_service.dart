@@ -85,6 +85,8 @@ class LocalStorageService {
 
   String getAccessTokenSync() => _instance.getString(accessTokenKey) ?? '';
 
+  String getRefreshTokenSync() => _instance.getString(refreshTokenKey) ?? '';
+
   Future<bool> isAuthenticated() async {
     final hasToken = (_instance.getString(accessTokenKey) ?? '').isNotEmpty;
     final flag = _instance.getBool(isAuthenticatedKey) ?? false;

@@ -1,20 +1,23 @@
+import 'package:admin/features/appointments/screens/appointment_details_screen.dart';
+import 'package:admin/features/appointments/screens/appointments_dashboard_screen.dart';
 import 'package:admin/features/auth/screens/auth_gate_screen.dart';
 import 'package:admin/features/auth/screens/otp_verification_screen.dart';
 import 'package:admin/features/auth/screens/reset_password_screen.dart';
+import 'package:admin/features/patients/screens/assign_doctor_screen.dart';
 import 'package:admin/features/patients/screens/patient_register_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
-import '../../features/dashboard/screens/appointments_dashboard_screen.dart';
 import '../../features/dashboard/screens/dashboard_screen.dart';
 import '../../features/doctors/screens/doctor_dashboard_screen.dart';
 import '../../features/doctors/screens/doctor_detail_screen.dart';
 import '../../features/doctors/screens/doctor_form_screen.dart';
 import '../../features/patients/screens/patient_dashboard_screen.dart';
 import '../../features/patients/screens/patient_detail_screen.dart';
-import '../../features/patients/screens/patient_summary_screen.dart';
+import '../../features/profile/screens/admin_profile_screen.dart';
+import '../../features/profile/screens/change_password_screen.dart';
 import '../widgets/custom_appbar.dart';
 import 'route_names.dart';
 
@@ -77,7 +80,7 @@ class AppRoutes {
     ),
     GetPage(
       name: RouteNames.doctorForm,
-      page: () => const AddEditDoctorScreen(),
+      page: () => const InviteDoctorScreen(),
       transition: Transition.rightToLeft,
       transitionDuration: const Duration(milliseconds: 250),
     ),
@@ -99,9 +102,34 @@ class AppRoutes {
       transition: Transition.rightToLeft,
       transitionDuration: const Duration(milliseconds: 250),
     ),
+    // Add to the pages list
+    GetPage(
+      name: RouteNames.assignDoctor,
+      page: () => const AssignDoctorScreen(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 250),
+    ),
     GetPage(
       name: RouteNames.appointments,
       page: () => const AppointmentManagementScreen(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 250),
+    ),
+    GetPage(
+      name: RouteNames.appointmentDetail,
+      page: () => const AppointmentDetailsScreen(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 250),
+    ),
+    GetPage(
+      name: RouteNames.profile,
+      page: () => const AdminProfileScreen(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 250),
+    ),
+    GetPage(
+      name: RouteNames.profileChangePassword,
+      page: () => const ChangePasswordScreen(),
       transition: Transition.rightToLeft,
       transitionDuration: const Duration(milliseconds: 250),
     ),

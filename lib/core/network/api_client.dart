@@ -22,6 +22,16 @@ class ApiClient {
     }
   }
 
+  /// The underlying [Dio] instance. Exposed so the [AuthInterceptor] can
+  /// replay queued requests (with a fresh token) after a successful refresh.
+  Dio get dio => _dio;
+
+  /// Attaches the [AuthInterceptor] to Dio so it can retry the original
+  /// request through the same interceptor chain after a token refresh.
+  void attachInterceptor(Interceptor interceptor) {
+    _dio.interceptors.add(interceptor);
+  }
+
   Future<Response> get(
     String path, {
     Map<String, dynamic>? queryParameters,
@@ -31,10 +41,22 @@ class ApiClient {
     return await _dio.get(path, queryParameters: queryParameters);
   }
 
-  Future<Response> post(String path, {dynamic data}) async {
+  Future<Response> post(
+    String path, {
+    dynamic data,
+    Duration? connectTimeout,
+    Duration? receiveTimeout,
+  }) async {
     debugPrint('BASE URL : ${_dio.options.baseUrl}');
     debugPrint('FULL URL : ${_dio.options.baseUrl}$path');
-    return await _dio.post(path, data: data);
+    return await _dio.post(
+      path,
+      data: data,
+      options: Options(
+        connectTimeout: connectTimeout,
+        receiveTimeout: receiveTimeout,
+      ),
+    );
   }
 
   Future<Response> put(String path, {dynamic data}) async {

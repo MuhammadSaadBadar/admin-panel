@@ -1,16 +1,16 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../core/routes/route_names.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/color_constants.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/routes/route_names.dart';
 import '../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../core/widgets/custom_appbar.dart';
 import '../controllers/patient_detail_controller.dart';
 import '../models/patient.dart';
 import '../models/patient_summary.dart';
 import '../repositories/patient_repository.dart';
-import '../../../core/network/api_client.dart';
 
 class PatientDetailsScreen extends StatefulWidget {
   const PatientDetailsScreen({super.key});
@@ -72,9 +72,7 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
       body: SafeArea(
         child: Row(
           children: [
-            // Desktop Sidebar
             if (!isMobile) _buildSidebar(),
-            // Main Content
             Expanded(
               child: Column(
                 children: [
@@ -87,7 +85,7 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
                       }
                       final patient = _controller.patient.value;
                       final summary = _controller.patientSummary.value;
-                      if (patient == null || summary == null) {
+                      if (patient == null) {
                         return const Center(
                           child: Text("Failed to load patient data"),
                         );
@@ -101,10 +99,10 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
                               opacity: _fadeAnimation,
                               child: Column(
                                 children: [
-                                  _buildProfileHeader(
-                                    isMobile,
-                                    patient,
-                                    summary,
+                                  _PatientProfileHeader(
+                                    isMobile: isMobile,
+                                    patient: patient,
+                                    summary: summary,
                                   ),
                                   SizedBox(height: isMobile ? 16 : 24),
                                   _buildBentoGrid(isMobile, patient, summary),
@@ -123,7 +121,15 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _buildActionBar(isMobile),
+      floatingActionButton: Obx(() {
+        final patient = _controller.patient.value;
+        if (patient == null) return const SizedBox.shrink();
+        return _ActionBar(
+          isMobile: isMobile,
+          patient: patient,
+          controller: _controller,
+        );
+      }),
       bottomNavigationBar: isMobile
           ? AppBottomNavBar(
               selectedIndex: 2,
@@ -317,11 +323,145 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
     );
   }
 
-  Widget _buildProfileHeader(
+  Widget _buildBentoGrid(
     bool isMobile,
     Patient patient,
-    PatientSummary summary,
+    PatientSummary? summary,
   ) {
+    if (isMobile) {
+      return Column(
+        children: [
+          _PersonalInfoCard(isMobile: isMobile, patient: patient),
+          const SizedBox(height: 16),
+          _PregnancyDetailsCard(isMobile: isMobile, summary: summary),
+          const SizedBox(height: 16),
+          _BabySizeCard(isMobile: isMobile, controller: _controller),
+          const SizedBox(height: 16),
+          _HealthTrackersCard(isMobile: isMobile, summary: summary),
+          const SizedBox(height: 16),
+          _SymptomsAndDietCard(isMobile: isMobile, summary: summary),
+          const SizedBox(height: 16),
+          _AppointmentHistoryCard(isMobile: isMobile, summary: summary),
+          const SizedBox(height: 16),
+          _MedicalReportsCard(isMobile: isMobile),
+          const SizedBox(height: 16),
+          _SosHistoryCard(isMobile: isMobile, controller: _controller),
+          const SizedBox(height: 80), // Padding for fab
+        ],
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 80.0), // Padding for fab
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 4,
+            child: Column(
+              children: [
+                _PersonalInfoCard(isMobile: false, patient: patient),
+                const SizedBox(height: 24),
+                _PregnancyDetailsCard(isMobile: false, summary: summary),
+                const SizedBox(height: 24),
+                _BabySizeCard(isMobile: false, controller: _controller),
+              ],
+            ),
+          ),
+          const SizedBox(width: 24),
+          Expanded(
+            flex: 8,
+            child: Column(
+              children: [
+                _HealthTrackersCard(isMobile: false, summary: summary),
+                const SizedBox(height: 24),
+                _SymptomsAndDietCard(isMobile: false, summary: summary),
+                const SizedBox(height: 24),
+                _AppointmentHistoryCard(isMobile: false, summary: summary),
+                const SizedBox(height: 24),
+                _MedicalReportsCard(isMobile: false),
+                const SizedBox(height: 24),
+                _SosHistoryCard(isMobile: false, controller: _controller),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PatientProfileHeader extends StatelessWidget {
+  final bool isMobile;
+  final Patient patient;
+  final PatientSummary? summary;
+
+  const _PatientProfileHeader({
+    required this.isMobile,
+    required this.patient,
+    required this.summary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final initials =
+        (patient.firstName.isNotEmpty
+            ? patient.firstName[0].toUpperCase()
+            : '') +
+        (patient.lastName.isNotEmpty ? patient.lastName[0].toUpperCase() : '');
+
+    final avatarWidget = Stack(
+      children: [
+        Container(
+          width: isMobile ? 80 : 128,
+          height: isMobile ? 80 : 128,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: ColorConstants.primaryContainer,
+            border: Border.all(color: ColorConstants.primary, width: 2),
+          ),
+          child: Center(
+            child: Text(
+              initials.isNotEmpty ? initials : "?",
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: isMobile ? 32 : 48,
+                fontWeight: FontWeight.bold,
+                color: ColorConstants.onPrimaryContainer,
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: isMobile ? 2 : 4,
+          right: isMobile ? 2 : 4,
+          child: Container(
+            width: isMobile ? 20 : 24,
+            height: isMobile ? 20 : 24,
+            decoration: BoxDecoration(
+              color: patient.isActive
+                  ? ColorConstants.tertiary
+                  : ColorConstants.error,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: ColorConstants.cardBackground,
+                width: isMobile ? 3 : 4,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    final bloodGroup =
+        (patient.patientProfile?.bloodGroup != null &&
+            patient.patientProfile!.bloodGroup!.isNotEmpty)
+        ? patient.patientProfile!.bloodGroup!
+        : 'N/A';
+
+    final weeks = summary?.pregnancyProgress?.currentWeek != null
+        ? '${summary!.pregnancyProgress!.currentWeek} Weeks'
+        : 'N/A';
+
     if (isMobile) {
       return Container(
         padding: const EdgeInsets.all(16),
@@ -338,46 +478,9 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
         ),
         child: Column(
           children: [
-            // Profile Image and basic info
             Row(
               children: [
-                Stack(
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: ColorConstants.primary,
-                          width: 2,
-                        ),
-                        image: const DecorationImage(
-                          image: NetworkImage(
-                            'https://lh3.googleusercontent.com/aida-public/AB6AXuDEHU7JAd4RhpKgcmJHy1EIueVPY3IjHgZKjr88o6ygDq3gZOdIrPWne_4vVlkBHVZ71lMbFVufgNzfRyQnMmsc7zQ5GjUekpbnhI0OyhScqT0UzJdc_cwwSoSOML45s8WPxjEP8U80aUkG5y0YPCLImW_gpx49C32eD3QuVzVbrqctrRvN9quiaL6nTkXzg_Rx2Eo3T-aQVEgevZAucuIiEeY4uS7-sA0dubSIfzEJEqHPtpeeSHMd',
-                          ),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 2,
-                      right: 2,
-                      child: Container(
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: ColorConstants.tertiary,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: ColorConstants.cardBackground,
-                            width: 3,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                avatarWidget,
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -401,62 +504,30 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: ColorConstants.error.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: ColorConstants.error,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'High Risk',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: ColorConstants.error,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _buildStatusBadge(),
                     ],
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            // Info chips
             Row(
               children: [
                 Expanded(
                   child: _buildInfoChip(
-                    icon: Icons.water_drop,
-                    label: patient.patientProfile?.bloodGroup ?? 'Unknown',
-                    iconColor: ColorConstants.tertiary,
+                    Icons.water_drop,
+                    bloodGroup,
+                    ColorConstants.tertiary,
+                    isMobile,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _buildInfoChip(
-                    icon: Icons.calendar_today,
-                    label: summary.pregnancyProgress?.currentWeek != null
-                        ? '${summary.pregnancyProgress!.currentWeek} Weeks'
-                        : 'N/A',
-                    iconColor: ColorConstants.primary,
+                    Icons.calendar_today,
+                    weeks,
+                    ColorConstants.primary,
+                    isMobile,
                   ),
                 ),
               ],
@@ -466,7 +537,6 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
       );
     }
 
-    // Desktop layout
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -482,43 +552,8 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
       ),
       child: Row(
         children: [
-          // Profile Image
-          Stack(
-            children: [
-              Container(
-                width: 128,
-                height: 128,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: ColorConstants.primary, width: 2),
-                  image: const DecorationImage(
-                    image: NetworkImage(
-                      'https://lh3.googleusercontent.com/aida-public/AB6AXuDEHU7JAd4RhpKgcmJHy1EIueVPY3IjHgZKjr88o6ygDq3gZOdIrPWne_4vVlkBHVZ71lMbFVufgNzfRyQnMmsc7zQ5GjUekpbnhI0OyhScqT0UzJdc_cwwSoSOML45s8WPxjEP8U80aUkG5y0YPCLImW_gpx49C32eD3QuVzVbrqctrRvN9quiaL6nTkXzg_Rx2Eo3T-aQVEgevZAucuIiEeY4uS7-sA0dubSIfzEJEqHPtpeeSHMd',
-                    ),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: 4,
-                right: 4,
-                child: Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: ColorConstants.tertiary,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: ColorConstants.cardBackground,
-                      width: 4,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          avatarWidget,
           const SizedBox(width: 24),
-          // Profile Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -534,38 +569,7 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: ColorConstants.error.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: ColorConstants.error,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'High Risk',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: ColorConstants.error,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    _buildStatusBadge(),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -581,17 +585,17 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
                 Row(
                   children: [
                     _buildInfoChip(
-                      icon: Icons.water_drop,
-                      label: patient.patientProfile?.bloodGroup ?? 'Unknown',
-                      iconColor: ColorConstants.tertiary,
+                      Icons.water_drop,
+                      bloodGroup,
+                      ColorConstants.tertiary,
+                      isMobile,
                     ),
                     const SizedBox(width: 12),
                     _buildInfoChip(
-                      icon: Icons.calendar_today,
-                      label: summary.pregnancyProgress?.currentWeek != null
-                          ? '${summary.pregnancyProgress!.currentWeek} Weeks'
-                          : 'N/A',
-                      iconColor: ColorConstants.primary,
+                      Icons.calendar_today,
+                      weeks,
+                      ColorConstants.primary,
+                      isMobile,
                     ),
                   ],
                 ),
@@ -603,13 +607,47 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
     );
   }
 
-  Widget _buildInfoChip({
-    required IconData icon,
-    required String label,
-    required Color iconColor,
-  }) {
-    final bool isMobile = MediaQuery.of(context).size.width < 768;
+  Widget _buildStatusBadge() {
+    final isActive = patient.isActive;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: isActive
+            ? ColorConstants.tertiary.withOpacity(0.15)
+            : ColorConstants.error.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: isActive ? ColorConstants.tertiary : ColorConstants.error,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            isActive ? 'Active' : 'Inactive',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isActive ? ColorConstants.tertiary : ColorConstants.error,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
+  Widget _buildInfoChip(
+    IconData icon,
+    String label,
+    Color iconColor,
+    bool isMobile,
+  ) {
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: isMobile ? 8 : 12,
@@ -636,66 +674,31 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
       ),
     );
   }
+}
 
-  Widget _buildBentoGrid(
-    bool isMobile,
-    Patient patient,
-    PatientSummary summary,
-  ) {
-    if (isMobile) {
-      return Column(
-        children: [
-          _buildPersonalInfoCard(isMobile, patient),
-          const SizedBox(height: 16),
-          _buildPregnancyDetailsCard(isMobile, summary),
-          const SizedBox(height: 16),
-          _buildHealthTrackers(isMobile, summary),
-          const SizedBox(height: 16),
-          _buildSymptomsAndDiet(isMobile, summary),
-          const SizedBox(height: 16),
-          _buildAppointmentHistory(isMobile, summary),
-          const SizedBox(height: 16),
-          _buildMedicalReports(isMobile),
-        ],
-      );
-    }
+class _PersonalInfoCard extends StatelessWidget {
+  final bool isMobile;
+  final Patient patient;
 
-    // Desktop layout
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Left Column
-        Expanded(
-          flex: 4,
-          child: Column(
-            children: [
-              _buildPersonalInfoCard(false, patient),
-              const SizedBox(height: 24),
-              _buildPregnancyDetailsCard(false, summary),
-            ],
-          ),
-        ),
-        const SizedBox(width: 24),
-        // Right Column
-        Expanded(
-          flex: 8,
-          child: Column(
-            children: [
-              _buildHealthTrackers(false, summary),
-              const SizedBox(height: 24),
-              _buildSymptomsAndDiet(false, summary),
-              const SizedBox(height: 24),
-              _buildAppointmentHistory(false, summary),
-              const SizedBox(height: 24),
-              _buildMedicalReports(false),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+  const _PersonalInfoCard({required this.isMobile, required this.patient});
 
-  Widget _buildPersonalInfoCard(bool isMobile, Patient patient) {
+  @override
+  Widget build(BuildContext context) {
+    final dob = patient.patientProfile?.dateOfBirth != null
+        ? '${patient.patientProfile!.dateOfBirth} (${patient.age} Yrs)'
+        : 'N/A';
+    final emergencyContactName =
+        (patient.patientProfile?.emergencyContactName?.isNotEmpty ?? false)
+        ? patient.patientProfile!.emergencyContactName!
+        : 'N/A';
+    final emergencyContactPhone =
+        (patient.patientProfile?.emergencyContactPhone?.isNotEmpty ?? false)
+        ? patient.patientProfile!.emergencyContactPhone!
+        : 'N/A';
+    final address = (patient.patientProfile?.address?.isNotEmpty ?? false)
+        ? patient.patientProfile!.address!
+        : 'N/A';
+
     return Container(
       padding: EdgeInsets.all(isMobile ? 12 : 16),
       decoration: BoxDecoration(
@@ -725,13 +728,7 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
             ],
           ),
           SizedBox(height: isMobile ? 12 : 16),
-          _buildInfoRow(
-            'Date of Birth',
-            patient.patientProfile?.dateOfBirth != null
-                ? '${patient.patientProfile!.dateOfBirth} (${patient.age} Yrs)'
-                : 'N/A',
-            isMobile,
-          ),
+          _buildInfoRow('Date of Birth', dob, isMobile),
           SizedBox(height: isMobile ? 8 : 12),
           _buildInfoRow(
             'Contact',
@@ -747,13 +744,9 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
             ),
           ),
           SizedBox(height: isMobile ? 8 : 12),
-          _buildInfoRow(
-            'Emergency Contact',
-            patient.patientProfile?.emergencyContactName ?? 'N/A',
-            isMobile,
-          ),
+          _buildInfoRow('Emergency Contact', emergencyContactName, isMobile),
           Text(
-            patient.patientProfile?.emergencyContactPhone ?? 'N/A',
+            emergencyContactPhone,
             style: GoogleFonts.plusJakartaSans(
               fontSize: isMobile ? 12 : 14,
               fontWeight: FontWeight.w400,
@@ -761,7 +754,7 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
             ),
           ),
           SizedBox(height: isMobile ? 8 : 12),
-          _buildInfoRow('Address', 'Not Available', isMobile),
+          _buildInfoRow('Address', address, isMobile),
         ],
       ),
     );
@@ -792,8 +785,18 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
       ],
     );
   }
+}
 
-  Widget _buildPregnancyDetailsCard(bool isMobile, PatientSummary summary) {
+class _PregnancyDetailsCard extends StatelessWidget {
+  final bool isMobile;
+  final PatientSummary? summary;
+
+  const _PregnancyDetailsCard({required this.isMobile, required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final prog = summary?.pregnancyProgress;
+
     return Container(
       padding: EdgeInsets.all(isMobile ? 12 : 16),
       decoration: BoxDecoration(
@@ -825,130 +828,137 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
             ],
           ),
           SizedBox(height: isMobile ? 12 : 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Current Progress',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: isMobile ? 12 : 14,
-                  fontWeight: FontWeight.w400,
-                  color: ColorConstants.onSurfaceVariant,
-                ),
+          if (prog == null)
+            Text(
+              'Pregnancy data not available.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                color: ColorConstants.onSurfaceVariant,
               ),
-              Text(
-                summary.pregnancyProgress?.currentWeek != null
-                    ? 'Week ${summary.pregnancyProgress!.currentWeek} (${((summary.pregnancyProgress!.percentComplete ?? 0) * 100).toStringAsFixed(0)}%)'
-                    : 'N/A',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: isMobile ? 12 : 14,
-                  fontWeight: FontWeight.w700,
-                  color: ColorConstants.primary,
+            )
+          else ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Current Progress',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: isMobile ? 12 : 14,
+                    fontWeight: FontWeight.w400,
+                    color: ColorConstants.onSurfaceVariant,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: summary.pregnancyProgress?.percentComplete ?? 0,
-              backgroundColor: ColorConstants.surfaceContainerHighest,
-              color: ColorConstants.primary,
-              minHeight: isMobile ? 6 : 8,
+                Text(
+                  prog.currentWeek != null
+                      ? 'Week ${prog.currentWeek} (${((prog.percentComplete ?? 0) * 100).toStringAsFixed(0)}%)'
+                      : 'N/A',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: isMobile ? 12 : 14,
+                    fontWeight: FontWeight.w700,
+                    color: ColorConstants.primary,
+                  ),
+                ),
+              ],
             ),
-          ),
-          SizedBox(height: isMobile ? 12 : 16),
-          Divider(height: 1, color: ColorConstants.borderWhite5),
-          SizedBox(height: isMobile ? 12 : 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'EDD',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: isMobile ? 10 : 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.05,
-                      color: ColorConstants.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    summary.pregnancyProgress?.eddDate ?? 'N/A',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: isMobile ? 14 : 16,
-                      fontWeight: FontWeight.w600,
-                      color: ColorConstants.onSurface,
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: prog.percentComplete ?? 0,
+                backgroundColor: ColorConstants.surfaceContainerHighest,
+                color: ColorConstants.primary,
+                minHeight: isMobile ? 6 : 8,
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'Conception',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: isMobile ? 10 : 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.05,
-                      color: ColorConstants.onSurfaceVariant,
+            ),
+            SizedBox(height: isMobile ? 12 : 16),
+            Divider(height: 1, color: ColorConstants.borderWhite5),
+            SizedBox(height: isMobile ? 12 : 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'EDD',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: isMobile ? 10 : 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.05,
+                        color: ColorConstants.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    summary.pregnancyProgress?.lmpDate ?? 'N/A',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: isMobile ? 14 : 16,
-                      fontWeight: FontWeight.w600,
-                      color: ColorConstants.onSurface,
+                    const SizedBox(height: 4),
+                    Text(
+                      prog.eddDate ?? 'N/A',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: isMobile ? 14 : 16,
+                        fontWeight: FontWeight.w600,
+                        color: ColorConstants.onSurface,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Conception',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: isMobile ? 10 : 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.05,
+                        color: ColorConstants.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      prog.lmpDate ?? 'N/A',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: isMobile ? 14 : 16,
+                        fontWeight: FontWeight.w600,
+                        color: ColorConstants.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
+}
 
-  Widget _buildHealthTrackers(bool isMobile, PatientSummary summary) {
+class _HealthTrackersCard extends StatelessWidget {
+  final bool isMobile;
+  final PatientSummary? summary;
+
+  const _HealthTrackersCard({required this.isMobile, required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
     if (isMobile) {
       return Column(
         children: [
-          _buildBloodPressureCard(isMobile, summary),
+          _buildBloodPressureCard(isMobile),
           const SizedBox(height: 12),
-          _buildBloodSugarCard(isMobile, summary),
-          const SizedBox(height: 12),
-          _buildKickCountsCard(isMobile),
-          const SizedBox(height: 12),
-          _buildWaterIntakeCard(isMobile),
+          _buildBloodSugarCard(isMobile),
         ],
       );
     }
-
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      childAspectRatio: 1.5,
+    return Row(
       children: [
-        _buildBloodPressureCard(false, summary),
-        _buildBloodSugarCard(false, summary),
-        _buildKickCountsCard(false),
-        _buildWaterIntakeCard(false),
+        Expanded(child: _buildBloodPressureCard(false)),
+        const SizedBox(width: 16),
+        Expanded(child: _buildBloodSugarCard(false)),
       ],
     );
   }
 
-  Widget _buildBloodPressureCard(bool isMobile, PatientSummary summary) {
+  Widget _buildBloodPressureCard(bool isMobile) {
+    final bp = summary?.latestBloodPressure;
     return Container(
       padding: EdgeInsets.all(isMobile ? 12 : 16),
       decoration: BoxDecoration(
@@ -978,8 +988,8 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
                     text: TextSpan(
                       children: [
                         TextSpan(
-                          text: summary.latestBloodPressure != null
-                              ? '${summary.latestBloodPressure!.systolic}/${summary.latestBloodPressure!.diastolic} '
+                          text: bp != null
+                              ? '${bp.systolic}/${bp.diastolic} '
                               : 'N/A ',
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: isMobile ? 20 : 24,
@@ -987,14 +997,15 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
                             color: ColorConstants.onSurface,
                           ),
                         ),
-                        TextSpan(
-                          text: 'mmHg',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: isMobile ? 12 : 14,
-                            fontWeight: FontWeight.w400,
-                            color: ColorConstants.onSurfaceVariant,
+                        if (bp != null)
+                          TextSpan(
+                            text: 'mmHg',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: isMobile ? 12 : 14,
+                              fontWeight: FontWeight.w400,
+                              color: ColorConstants.onSurfaceVariant,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -1007,35 +1018,24 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
               ),
             ],
           ),
-          SizedBox(height: isMobile ? 8 : 12),
-          Row(
-            children: [
-              _buildMiniBar(20, ColorConstants.error.withOpacity(0.2)),
-              _buildMiniBar(30, ColorConstants.error.withOpacity(0.2)),
-              _buildMiniBar(25, ColorConstants.error.withOpacity(0.2)),
-              _buildMiniBar(40, ColorConstants.error),
-              _buildMiniBar(35, ColorConstants.error.withOpacity(0.2)),
-            ],
-          ),
+          if (bp == null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text(
+                'No reading today',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  color: ColorConstants.onSurfaceVariant,
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildMiniBar(double height, Color color) {
-    return Expanded(
-      child: Container(
-        height: height,
-        margin: const EdgeInsets.symmetric(horizontal: 2),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(2),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBloodSugarCard(bool isMobile, PatientSummary summary) {
+  Widget _buildBloodSugarCard(bool isMobile) {
+    final bs = summary?.latestBloodSugar;
     return Container(
       padding: EdgeInsets.all(isMobile ? 12 : 16),
       decoration: BoxDecoration(
@@ -1065,23 +1065,22 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
                     text: TextSpan(
                       children: [
                         TextSpan(
-                          text: summary.latestBloodSugar != null
-                              ? '${summary.latestBloodSugar!.valueMgDl} '
-                              : 'N/A ',
+                          text: bs != null ? '${bs.valueMgDl} ' : 'N/A ',
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: isMobile ? 20 : 24,
                             fontWeight: FontWeight.w600,
                             color: ColorConstants.onSurface,
                           ),
                         ),
-                        TextSpan(
-                          text: 'mg/dL',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: isMobile ? 12 : 14,
-                            fontWeight: FontWeight.w400,
-                            color: ColorConstants.onSurfaceVariant,
+                        if (bs != null)
+                          TextSpan(
+                            text: 'mg/dL',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: isMobile ? 12 : 14,
+                              fontWeight: FontWeight.w400,
+                              color: ColorConstants.onSurfaceVariant,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -1094,36 +1093,69 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
               ),
             ],
           ),
-          SizedBox(height: isMobile ? 4 : 8),
-          Row(
-            children: [
-              Icon(
-                Icons.trending_down,
-                color: ColorConstants.tertiary,
-                size: isMobile ? 14 : 16,
-              ),
-              const SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  summary.latestBloodSugar?.readingContext ?? 'N/A',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: isMobile ? 10 : 12,
-                    fontWeight: FontWeight.w500,
+          if (bs != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.trending_down,
                     color: ColorConstants.tertiary,
+                    size: isMobile ? 14 : 16,
                   ),
-                  overflow: TextOverflow.ellipsis,
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      bs.readingContext ?? 'N/A',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: isMobile ? 10 : 12,
+                        fontWeight: FontWeight.w500,
+                        color: ColorConstants.tertiary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text(
+                'No reading today',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  color: ColorConstants.onSurfaceVariant,
                 ),
               ),
-            ],
-          ),
+            ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildKickCountsCard(bool isMobile) {
-    return Container(
-      padding: EdgeInsets.all(isMobile ? 12 : 16),
+class _SymptomsAndDietCard extends StatelessWidget {
+  final bool isMobile;
+  final PatientSummary? summary;
+
+  const _SymptomsAndDietCard({required this.isMobile, required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final recentSymptoms = summary?.recentSymptoms ?? [];
+    final symptomNames = <String>[];
+    for (final log in recentSymptoms) {
+      for (final item in log.symptoms) {
+        if (item.name.isNotEmpty && !symptomNames.contains(item.name)) {
+          symptomNames.add(item.name);
+        }
+      }
+    }
+    final dietPlan = summary?.activeDietPlan;
+
+    final symptomsWidget = Container(
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: ColorConstants.cardBackground,
         borderRadius: BorderRadius.circular(12),
@@ -1132,314 +1164,79 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Kick Counts',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: isMobile ? 10 : 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.05,
-                      color: ColorConstants.onSurfaceVariant,
-                    ),
-                  ),
-                  RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: '12 ',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: isMobile ? 20 : 24,
-                            fontWeight: FontWeight.w600,
-                            color: ColorConstants.onSurface,
-                          ),
-                        ),
-                        TextSpan(
-                          text: '/ 2hrs',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: isMobile ? 12 : 14,
-                            fontWeight: FontWeight.w400,
-                            color: ColorConstants.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              Icon(
-                Icons.child_care,
-                color: ColorConstants.secondary,
-                size: isMobile ? 20 : 24,
-              ),
-            ],
-          ),
-          SizedBox(height: isMobile ? 4 : 8),
           Text(
-            'Average for week: 10/2hr',
+            'Logged Symptoms',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: isMobile ? 10 : 12,
-              fontWeight: FontWeight.w500,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: ColorConstants.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (symptomNames.isEmpty)
+            Text(
+              'No recent symptoms logged.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                color: ColorConstants.onSurfaceVariant,
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: symptomNames
+                  .map((s) => _buildSymptomChip(s, ColorConstants.error))
+                  .toList(),
+            ),
+        ],
+      ),
+    );
+
+    final dietWidget = Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: ColorConstants.cardBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ColorConstants.borderWhite10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Diet Plan',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: ColorConstants.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            dietPlan?.notes ?? 'No active diet plan.',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+              fontStyle: FontStyle.italic,
               color: ColorConstants.onSurfaceVariant,
             ),
           ),
         ],
       ),
     );
-  }
 
-  Widget _buildWaterIntakeCard(bool isMobile) {
-    return Container(
-      padding: EdgeInsets.all(isMobile ? 12 : 16),
-      decoration: BoxDecoration(
-        color: ColorConstants.cardBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ColorConstants.borderWhite10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Water Intake',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: isMobile ? 10 : 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.05,
-                      color: ColorConstants.onSurfaceVariant,
-                    ),
-                  ),
-                  RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: '8 ',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: isMobile ? 20 : 24,
-                            fontWeight: FontWeight.w600,
-                            color: ColorConstants.onSurface,
-                          ),
-                        ),
-                        TextSpan(
-                          text: '/ 10 glasses',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: isMobile ? 12 : 14,
-                            fontWeight: FontWeight.w400,
-                            color: ColorConstants.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              Icon(
-                Icons.water_drop,
-                color: Colors.blue.shade400,
-                size: isMobile ? 20 : 24,
-              ),
-            ],
-          ),
-          SizedBox(height: isMobile ? 8 : 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: 0.8,
-              backgroundColor: ColorConstants.surfaceContainerHighest,
-              color: Colors.blue.shade400,
-              minHeight: isMobile ? 4 : 6,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSymptomsAndDiet(bool isMobile, PatientSummary summary) {
     if (isMobile) {
       return Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: ColorConstants.cardBackground,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: ColorConstants.borderWhite10),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Logged Symptoms',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: ColorConstants.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildSymptomChip('Fatigue', ColorConstants.error),
-                    _buildSymptomChip('Back Pain', ColorConstants.primary),
-                    _buildSymptomChip('Mild Nausea', ColorConstants.tertiary),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: ColorConstants.cardBackground,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: ColorConstants.borderWhite10),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Diet Plan',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: ColorConstants.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  summary.activeDietPlan?.notes ?? 'No active diet plan.',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    fontStyle: FontStyle.italic,
-                    color: ColorConstants.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: () {},
-                  icon: Icon(
-                    Icons.open_in_new,
-                    color: ColorConstants.primary,
-                    size: 14,
-                  ),
-                  label: Text(
-                    'View Full Plan',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: ColorConstants.primary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [symptomsWidget, const SizedBox(height: 12), dietWidget],
       );
     }
-
-    // Desktop layout
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: ColorConstants.cardBackground,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: ColorConstants.borderWhite10),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Logged Symptoms',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: ColorConstants.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildSymptomChip('Fatigue', ColorConstants.error),
-                    _buildSymptomChip('Back Pain', ColorConstants.primary),
-                    _buildSymptomChip('Mild Nausea', ColorConstants.tertiary),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
+        Expanded(child: symptomsWidget),
         const SizedBox(width: 16),
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: ColorConstants.cardBackground,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: ColorConstants.borderWhite10),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Diet Plan',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: ColorConstants.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  summary.activeDietPlan?.notes ?? 'No active diet plan.',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    fontStyle: FontStyle.italic,
-                    color: ColorConstants.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextButton.icon(
-                  onPressed: () {},
-                  icon: Icon(
-                    Icons.open_in_new,
-                    color: ColorConstants.primary,
-                    size: 16,
-                  ),
-                  label: Text(
-                    'View Full Plan',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.05,
-                      color: ColorConstants.primary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        Expanded(child: dietWidget),
       ],
     );
   }
@@ -1472,9 +1269,23 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
       ),
     );
   }
+}
 
-  Widget _buildAppointmentHistory(bool isMobile, PatientSummary summary) {
+class _AppointmentHistoryCard extends StatelessWidget {
+  final bool isMobile;
+  final PatientSummary? summary;
+
+  const _AppointmentHistoryCard({
+    required this.isMobile,
+    required this.summary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final appointments = summary?.upcomingAppointments ?? [];
+
     return Container(
+      width: double.infinity,
       padding: EdgeInsets.all(isMobile ? 12 : 16),
       decoration: BoxDecoration(
         color: ColorConstants.cardBackground,
@@ -1484,106 +1295,94 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Appointment History',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: isMobile ? 18 : 20,
-                  fontWeight: FontWeight.w600,
-                  color: ColorConstants.onSurface,
-                ),
-              ),
-              TextButton(
-                onPressed: () {},
-                child: Text(
-                  'VIEW ALL',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: isMobile ? 10 : 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.05,
-                    color: ColorConstants.primaryContainer,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: isMobile ? 4 : 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              columnSpacing: isMobile ? 16 : 32,
-              headingRowColor: WidgetStateProperty.all(
-                Colors.white.withOpacity(0.05),
-              ),
-              headingTextStyle: GoogleFonts.plusJakartaSans(
-                fontSize: isMobile ? 10 : 12,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.05,
-                color: ColorConstants.onSurfaceVariant,
-              ),
-              dataTextStyle: GoogleFonts.plusJakartaSans(
-                fontSize: isMobile ? 12 : 14,
-                fontWeight: FontWeight.w400,
-                color: ColorConstants.onSurface,
-              ),
-              columns: const [
-                DataColumn(label: Text('Date')),
-                DataColumn(label: Text('Doctor')),
-                DataColumn(label: Text('Type')),
-                DataColumn(label: Text('Status')),
-              ],
-              rows: [
-                DataRow(
-                  cells: [
-                    const DataCell(
-                      Text(
-                        'Aug 15, 2024',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    const DataCell(Text('Dr. Sarah Jenkins')),
-                    const DataCell(Text('Routine Checkup')),
-                    DataCell(
-                      Text(
-                        'Completed',
-                        style: TextStyle(color: ColorConstants.tertiary),
-                      ),
-                    ),
-                  ],
-                ),
-                DataRow(
-                  cells: [
-                    const DataCell(
-                      Text(
-                        'Sep 02, 2024',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    const DataCell(Text('Dr. James Miller')),
-                    const DataCell(Text('Ultrasound')),
-                    DataCell(
-                      Text(
-                        'Upcoming',
-                        style: TextStyle(
-                          color: ColorConstants.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          Text(
+            'Upcoming Appointments',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: isMobile ? 18 : 20,
+              fontWeight: FontWeight.w600,
+              color: ColorConstants.onSurface,
             ),
           ),
+          SizedBox(height: isMobile ? 4 : 8),
+          if (appointments.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16.0),
+              child: Text(
+                'No upcoming appointments.',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  color: ColorConstants.onSurfaceVariant,
+                ),
+              ),
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columnSpacing: isMobile ? 16 : 32,
+                headingRowColor: WidgetStateProperty.all(
+                  Colors.white.withOpacity(0.05),
+                ),
+                headingTextStyle: GoogleFonts.plusJakartaSans(
+                  fontSize: isMobile ? 10 : 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.05,
+                  color: ColorConstants.onSurfaceVariant,
+                ),
+                dataTextStyle: GoogleFonts.plusJakartaSans(
+                  fontSize: isMobile ? 12 : 14,
+                  fontWeight: FontWeight.w400,
+                  color: ColorConstants.onSurface,
+                ),
+                columns: const [
+                  DataColumn(label: Text('Date')),
+                  DataColumn(label: Text('Doctor')),
+                  DataColumn(label: Text('Status')),
+                ],
+                rows: appointments.map((appt) {
+                  return DataRow(
+                    cells: [
+                      DataCell(
+                        Text(
+                          appt.scheduledAt.isNotEmpty
+                              ? appt.scheduledAt
+                              : 'Unknown',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      DataCell(
+                        Text(
+                          appt.appointmentType.isNotEmpty
+                              ? appt.appointmentType
+                              : 'Unknown',
+                        ),
+                      ),
+                      DataCell(
+                        Text(
+                          appt.status.isNotEmpty ? appt.status : 'Pending',
+                          style: TextStyle(color: ColorConstants.tertiary),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildMedicalReports(bool isMobile) {
+class _MedicalReportsCard extends StatelessWidget {
+  final bool isMobile;
+
+  const _MedicalReportsCard({required this.isMobile});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       padding: EdgeInsets.all(isMobile ? 12 : 16),
       decoration: BoxDecoration(
         color: ColorConstants.cardBackground,
@@ -1602,261 +1401,614 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
             ),
           ),
           SizedBox(height: isMobile ? 8 : 12),
-          if (isMobile)
-            Column(
-              children: [
-                _buildReportItem(
-                  'Blood_Work_Q2.pdf',
-                  'July 10, 2024 • 1.2 MB',
-                  isMobile,
-                ),
-                const SizedBox(height: 8),
-                _buildReportItem(
-                  'Ultrasound_20wk.pdf',
-                  'July 28, 2024 • 4.5 MB',
-                  isMobile,
-                ),
-              ],
-            )
-          else
-            Row(
-              children: [
-                Expanded(
-                  child: _buildReportItem(
-                    'Blood_Work_Q2.pdf',
-                    'July 10, 2024 • 1.2 MB',
-                    false,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildReportItem(
-                    'Ultrasound_20wk.pdf',
-                    'July 28, 2024 • 4.5 MB',
-                    false,
-                  ),
-                ),
-              ],
+          Text(
+            'No medical reports available.',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              color: ColorConstants.onSurfaceVariant,
             ),
+          ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildReportItem(String title, String subtitle, bool isMobile) {
+class _BabySizeCard extends StatelessWidget {
+  final bool isMobile;
+  final PatientDetailController controller;
+
+  const _BabySizeCard({required this.isMobile, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.all(isMobile ? 10 : 12),
+      width: double.infinity,
+      padding: EdgeInsets.all(isMobile ? 12 : 16),
       decoration: BoxDecoration(
-        color: ColorConstants.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: ColorConstants.borderWhite5),
+        color: ColorConstants.cardBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ColorConstants.borderWhite10),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.picture_as_pdf,
-            color: ColorConstants.error,
-            size: isMobile ? 20 : 24,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Baby Size',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: isMobile ? 18 : 20,
+                  fontWeight: FontWeight.w600,
+                  color: ColorConstants.onSurface,
+                ),
+              ),
+              Icon(
+                Icons.child_friendly,
+                color: ColorConstants.primary,
+                size: isMobile ? 20 : 24,
+              ),
+            ],
           ),
-          SizedBox(width: isMobile ? 8 : 12),
-          Expanded(
-            child: Column(
+          SizedBox(height: isMobile ? 8 : 12),
+          Obx(() {
+            if (controller.isLoadingBabySize.value) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              );
+            }
+            if (controller.babySizeError.value != null) {
+              return Text(
+                'Baby size data unavailable.',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  color: ColorConstants.onSurfaceVariant,
+                ),
+              );
+            }
+            final baby = controller.babySize.value;
+            if (baby == null) {
+              return Text(
+                'No baby size data for this week.',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  color: ColorConstants.onSurfaceVariant,
+                ),
+              );
+            }
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.straighten,
+                      color: ColorConstants.primary,
+                      size: isMobile ? 16 : 18,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Week ${baby.week}',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: isMobile ? 16 : 18,
+                        fontWeight: FontWeight.w700,
+                        color: ColorConstants.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 Text(
-                  title,
+                  baby.sizeComparison.isNotEmpty
+                      ? 'Size of a ${baby.sizeComparison}'
+                      : 'Size comparison not available.',
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: isMobile ? 12 : 14,
+                    fontSize: isMobile ? 14 : 16,
                     fontWeight: FontWeight.w600,
                     color: ColorConstants.onSurface,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: isMobile ? 10 : 12,
-                    fontWeight: FontWeight.w500,
-                    color: ColorConstants.onSurfaceVariant,
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 4,
+                  children: [
+                    if (baby.lengthCm.isNotEmpty)
+                      _buildMetric('Length', baby.lengthCm, 'cm'),
+                    if (baby.weightGrams.isNotEmpty)
+                      _buildMetric('Weight', baby.weightGrams, 'g'),
+                  ],
+                ),
+                if (baby.description.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    baby.description,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: ColorConstants.onSurfaceVariant,
+                    ),
                   ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+                ],
               ],
-            ),
-          ),
-          SizedBox(width: isMobile ? 4 : 8),
-          Icon(
-            Icons.download,
-            color: ColorConstants.onSurfaceVariant,
-            size: isMobile ? 18 : 20,
-          ),
+            );
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildActionBar(bool isMobile) {
+  Widget _buildMetric(String label, String value, String unit) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '$label: ',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: ColorConstants.onSurfaceVariant,
+          ),
+        ),
+        Text(
+          '$value $unit',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: ColorConstants.onSurface,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SosHistoryCard extends StatelessWidget {
+  final bool isMobile;
+  final PatientDetailController controller;
+
+  const _SosHistoryCard({required this.isMobile, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(isMobile ? 12 : 16),
+      decoration: BoxDecoration(
+        color: ColorConstants.cardBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border(left: BorderSide(color: ColorConstants.error, width: 4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Emergency SOS History',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: isMobile ? 18 : 20,
+                  fontWeight: FontWeight.w600,
+                  color: ColorConstants.onSurface,
+                ),
+              ),
+              Icon(
+                Icons.emergency,
+                color: ColorConstants.error,
+                size: isMobile ? 20 : 24,
+              ),
+            ],
+          ),
+          SizedBox(height: isMobile ? 8 : 12),
+          Obx(() {
+            if (controller.isLoadingSos.value) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              );
+            }
+            if (controller.sosError.value != null) {
+              return Text(
+                'SOS history unavailable.',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  color: ColorConstants.onSurfaceVariant,
+                ),
+              );
+            }
+            final events = controller.sosHistory;
+            if (events.isEmpty) {
+              return Text(
+                'No emergency SOS events.',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  color: ColorConstants.onSurfaceVariant,
+                ),
+              );
+            }
+            return Column(
+              children: events.take(5).map((event) {
+                final isActive = event.isActive;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: EdgeInsets.all(isMobile ? 10 : 12),
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? ColorConstants.error.withOpacity(0.08)
+                        : ColorConstants.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: isActive
+                              ? ColorConstants.error
+                              : ColorConstants.success,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              event.createdAt.isNotEmpty
+                                  ? event.createdAt
+                                  : 'Unknown time',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: isMobile ? 13 : 14,
+                                fontWeight: FontWeight.w600,
+                                color: ColorConstants.onSurface,
+                              ),
+                            ),
+                            if (event.notes.isNotEmpty)
+                              Text(
+                                event.notes,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  color: ColorConstants.onSurfaceVariant,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
+                        ),
+                      ),
+                      _buildStatusBadge(event.status),
+                    ],
+                  ),
+                );
+              }).toList(),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(String status) {
+    final color = status == 'active'
+        ? ColorConstants.error
+        : status == 'resolved'
+        ? ColorConstants.success
+        : ColorConstants.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        status.replaceAll('_', ' ').toUpperCase(),
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionBar extends StatelessWidget {
+  final bool isMobile;
+  final Patient patient;
+  final PatientDetailController controller;
+
+  const _ActionBar({
+    required this.isMobile,
+    required this.patient,
+    required this.controller,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = patient.isActive;
+
     return Container(
       margin: EdgeInsets.only(bottom: isMobile ? 5 : 0),
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: isMobile ? 16 : 24,
-          vertical: isMobile ? 12 : 16,
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 24,
+        vertical: isMobile ? 12 : 16,
+      ),
+      decoration: BoxDecoration(
+        color: ColorConstants.surfaceContainer.withOpacity(0.9),
+        border: Border(top: BorderSide(color: ColorConstants.borderWhite10)),
+      ),
+      child: isMobile
+          ? _buildMobileLayout(context, isActive)
+          : _buildDesktopLayout(context, isActive),
+    );
+  }
+
+  Widget _buildMobileLayout(BuildContext context, bool isActive) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      alignment: WrapAlignment.center,
+      children: [
+        _buildMobileButton(
+          label: 'Assign Doctor',
+          icon: Icons.person_add_alt_1,
+          color: ColorConstants.secondary,
+          onPressed: () => _navigateToAssignDoctor(),
         ),
-        decoration: BoxDecoration(
-          color: ColorConstants.surfaceContainer.withOpacity(0.9),
-          border: Border(top: BorderSide(color: ColorConstants.borderWhite10)),
+        _buildMobileButton(
+          label: isActive ? 'Deactivate' : 'Activate',
+          icon: isActive ? Icons.block : Icons.check_circle_outline,
+          color: isActive ? Colors.orange.shade400 : Colors.green.shade400,
+          onPressed: () => _confirmStatusToggle(context, isActive),
         ),
-        child: isMobile
-            ? Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {},
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: ColorConstants.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        side: BorderSide(color: ColorConstants.primary),
-                      ),
-                      child: Text(
-                        'Edit',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
+        // _buildMobileButton(
+        //   label: 'Delete',
+        //   icon: Icons.delete_outline,
+        //   color: ColorConstants.error,
+        //   onPressed: () {},
+        //   filled: true,
+        // ),
+      ],
+    );
+  }
+
+  Widget _buildMobileButton({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onPressed,
+    bool filled = false,
+  }) {
+    if (filled) {
+      return ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 16),
+        label: Text(
+          label,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: ColorConstants.onError,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          elevation: 2,
+        ),
+      );
+    }
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 16),
+      label: Text(
+        label,
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: color,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        side: BorderSide(color: color.withOpacity(0.4)),
+        backgroundColor: color.withOpacity(0.1),
+      ),
+    );
+  }
+
+  Widget _buildDesktopLayout(BuildContext context, bool isActive) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        // Assign Doctor button
+        OutlinedButton.icon(
+          onPressed: () => _navigateToAssignDoctor(),
+          icon: const Icon(Icons.person_add_alt_1, size: 18),
+          label: Text(
+            'Assign Doctor',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.05,
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: ColorConstants.secondary,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            side: BorderSide(color: ColorConstants.secondary.withOpacity(0.4)),
+          ),
+        ),
+        const SizedBox(width: 12),
+        // Activate / Deactivate toggle
+        Obx(() {
+          final updating = controller.isUpdatingStatus.value;
+          return OutlinedButton.icon(
+            onPressed: updating
+                ? null
+                : () => _confirmStatusToggle(context, isActive),
+            icon: updating
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(
+                    isActive ? Icons.block : Icons.check_circle_outline,
+                    size: 18,
                   ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {},
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.orange.shade400,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        side: BorderSide(
-                          color: Colors.orange.shade400.withOpacity(0.3),
-                        ),
-                        backgroundColor: Colors.orange.shade400.withOpacity(
-                          0.2,
-                        ),
-                      ),
-                      child: Text(
-                        'Suspend',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ColorConstants.error,
-                        foregroundColor: ColorConstants.onError,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        elevation: 4,
-                      ),
-                      child: Text(
-                        'Delete',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton(
-                    onPressed: () {},
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: ColorConstants.primary,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 10,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      side: BorderSide(color: ColorConstants.primary),
-                    ),
-                    child: Text(
-                      'Edit Details',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.05,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  OutlinedButton(
-                    onPressed: () {},
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.orange.shade400,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 10,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      side: BorderSide(
-                        color: Colors.orange.shade400.withOpacity(0.3),
-                      ),
-                      backgroundColor: Colors.orange.shade400.withOpacity(0.2),
-                    ),
-                    child: Text(
-                      'Suspend',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.05,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: ColorConstants.error,
-                      foregroundColor: ColorConstants.onError,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 10,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 4,
-                    ),
-                    child: Text(
-                      'Delete Record',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.05,
-                      ),
-                    ),
-                  ),
-                ],
+            label: Text(
+              isActive ? 'Deactivate Patient' : 'Activate Patient',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.05,
               ),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: isActive
+                  ? Colors.orange.shade400
+                  : Colors.green.shade400,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              side: BorderSide(
+                color:
+                    (isActive ? Colors.orange.shade400 : Colors.green.shade400)
+                        .withOpacity(0.3),
+              ),
+              backgroundColor:
+                  (isActive ? Colors.orange.shade400 : Colors.green.shade400)
+                      .withOpacity(0.15),
+            ),
+          );
+        }),
+        const SizedBox(width: 12),
+        ElevatedButton.icon(
+          onPressed: () {},
+          icon: const Icon(Icons.delete_outline, size: 18),
+          label: Text(
+            'Delete Record',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.05,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: ColorConstants.error,
+            foregroundColor: ColorConstants.onError,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            elevation: 4,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Navigation ──────────────────────────────────────────────────────────
+  void _navigateToAssignDoctor() {
+    debugPrint(
+      '[ActionBar] Navigating to Assign Doctor for patientId=${patient.id}',
+    );
+    Get.toNamed(RouteNames.assignDoctor, arguments: {'patientId': patient.id});
+  }
+
+  // ── Status Toggle ──────────────────────────────────────────────────────
+  void _confirmStatusToggle(BuildContext context, bool currentlyActive) {
+    final newStatus = !currentlyActive;
+    final actionLabel = newStatus ? 'Activate' : 'Deactivate';
+    debugPrint(
+      '[ActionBar] Status toggle requested: ${currentlyActive ? "active→inactive" : "inactive→active"}',
+    );
+
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: ColorConstants.cardBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          '$actionLabel Patient',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: ColorConstants.onSurface,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to ${actionLabel.toLowerCase()} ${patient.name}?',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 14,
+            color: ColorConstants.onSurfaceVariant,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: ColorConstants.onSurfaceVariant,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Get.back(); // Close dialog
+              try {
+                await controller.updateAccountStatus(newStatus);
+                Get.snackbar(
+                  'Success',
+                  '${patient.name} has been ${actionLabel.toLowerCase()}d.',
+                  snackPosition: SnackPosition.BOTTOM,
+                  duration: const Duration(seconds: 3),
+                );
+              } catch (e) {
+                Get.snackbar(
+                  'Error',
+                  'Failed to $actionLabel patient. Please try again.',
+                  snackPosition: SnackPosition.BOTTOM,
+                  duration: const Duration(seconds: 4),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: newStatus
+                  ? Colors.green.shade400
+                  : Colors.orange.shade400,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              actionLabel,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,0 +1,858 @@
+[
+  {
+    "path": "/api/v1/auth/register/",
+    "method": "post",
+    "tags": [
+      "Auth"
+    ],
+    "summary": "Register a new patient"
+  },
+  {
+    "path": "/api/v1/auth/verify-email/",
+    "method": "post",
+    "tags": [
+      "Auth"
+    ],
+    "summary": "Verify email with token"
+  },
+  {
+    "path": "/api/v1/auth/resend-verification/",
+    "method": "post",
+    "tags": [
+      "Auth"
+    ],
+    "summary": "Resend the verification email"
+  },
+  {
+    "path": "/api/v1/auth/login/",
+    "method": "post",
+    "tags": [
+      "Auth"
+    ],
+    "summary": "Login (obtain JWT access + refresh tokens)"
+  },
+  {
+    "path": "/api/v1/auth/token/refresh/",
+    "method": "post",
+    "tags": [
+      "Auth"
+    ],
+    "summary": "Refresh an access token"
+  },
+  {
+    "path": "/api/v1/auth/logout/",
+    "method": "post",
+    "tags": [
+      "Auth"
+    ],
+    "summary": "Logout (blacklist refresh token)"
+  },
+  {
+    "path": "/api/v1/auth/password/forgot/",
+    "method": "post",
+    "tags": [
+      "Auth"
+    ],
+    "summary": "Request a password reset code (step 1 of 3)"
+  },
+  {
+    "path": "/api/v1/auth/password/verify-otp/",
+    "method": "post",
+    "tags": [
+      "Auth"
+    ],
+    "summary": "Verify the password reset code (step 2 of 3)"
+  },
+  {
+    "path": "/api/v1/auth/password/reset/",
+    "method": "post",
+    "tags": [
+      "Auth"
+    ],
+    "summary": "Reset password with token (step 3 of 3)"
+  },
+  {
+    "path": "/api/v1/auth/password/change/",
+    "method": "post",
+    "tags": [
+      "Auth"
+    ],
+    "summary": "Change password (authenticated)"
+  },
+  {
+    "path": "/api/v1/auth/me/",
+    "method": "get",
+    "tags": [
+      "Auth"
+    ],
+    "summary": "Get the current user"
+  },
+  {
+    "path": "/api/v1/auth/me/",
+    "method": "patch",
+    "tags": [
+      "Auth"
+    ],
+    "summary": "Update the current user's profile"
+  },
+  {
+    "path": "/api/v1/accounts/doctors/invite/",
+    "method": "post",
+    "tags": [
+      "Accounts"
+    ],
+    "summary": "Invite a doctor (admin only)"
+  },
+  {
+    "path": "/api/v1/accounts/doctors/invite/accept/",
+    "method": "post",
+    "tags": [
+      "Accounts"
+    ],
+    "summary": "Accept a doctor invite"
+  },
+  {
+    "path": "/api/v1/accounts/me/patient-profile/",
+    "method": "get",
+    "tags": [
+      "Accounts"
+    ],
+    "summary": "View/update my patient profile"
+  },
+  {
+    "path": "/api/v1/accounts/me/patient-profile/",
+    "method": "put",
+    "tags": [
+      "Accounts"
+    ],
+    "summary": "View/update my patient profile"
+  },
+  {
+    "path": "/api/v1/accounts/me/patient-profile/",
+    "method": "patch",
+    "tags": [
+      "Accounts"
+    ],
+    "summary": "View/update my patient profile"
+  },
+  {
+    "path": "/api/v1/accounts/me/doctor-profile/",
+    "method": "get",
+    "tags": [
+      "Accounts"
+    ],
+    "summary": "View/update my doctor profile"
+  },
+  {
+    "path": "/api/v1/accounts/me/doctor-profile/",
+    "method": "put",
+    "tags": [
+      "Accounts"
+    ],
+    "summary": "View/update my doctor profile"
+  },
+  {
+    "path": "/api/v1/accounts/me/doctor-profile/",
+    "method": "patch",
+    "tags": [
+      "Accounts"
+    ],
+    "summary": "View/update my doctor profile"
+  },
+  {
+    "path": "/api/v1/accounts/doctors/",
+    "method": "get",
+    "tags": [
+      "Accounts"
+    ],
+    "summary": "List doctors"
+  },
+  {
+    "path": "/api/v1/accounts/doctors/{id}/",
+    "method": "patch",
+    "tags": [
+      "Accounts"
+    ],
+    "summary": "Update a doctor (admin only)"
+  },
+  {
+    "path": "/api/v1/accounts/doctors/{id}/",
+    "method": "get",
+    "tags": [
+      "Accounts"
+    ],
+    "summary": "Get a single doctor"
+  },
+  {
+    "path": "/api/v1/accounts/patients/",
+    "method": "get",
+    "tags": [
+      "Accounts"
+    ],
+    "summary": "List patients"
+  },
+  {
+    "path": "/api/v1/accounts/patients/{id}/",
+    "method": "patch",
+    "tags": [
+      "Accounts"
+    ],
+    "summary": "Update a patient (admin only)"
+  },
+  {
+    "path": "/api/v1/accounts/patients/{id}/",
+    "method": "get",
+    "tags": [
+      "Accounts"
+    ],
+    "summary": "Get a single patient"
+  },
+  {
+    "path": "/api/v1/accounts/patients/{id}/assign-doctor/",
+    "method": "post",
+    "tags": [
+      "Accounts"
+    ],
+    "summary": "Assign a doctor to a patient (admin only)"
+  },
+  {
+    "path": "/api/v1/appointments/",
+    "method": "post",
+    "tags": [
+      "Appointments"
+    ],
+    "summary": "Book an appointment"
+  },
+  {
+    "path": "/api/v1/appointments/",
+    "method": "get",
+    "tags": [
+      "Appointments"
+    ],
+    "summary": "List appointments"
+  },
+  {
+    "path": "/api/v1/appointments/{id}/",
+    "method": "patch",
+    "tags": [
+      "Appointments"
+    ],
+    "summary": "Update appointment fields (rarely used directly \u2014 prefer the /status/ and /doctor-notes/ actions below)"
+  },
+  {
+    "path": "/api/v1/appointments/{id}/",
+    "method": "get",
+    "tags": [
+      "Appointments"
+    ],
+    "summary": "Get a single appointment"
+  },
+  {
+    "path": "/api/v1/appointments/{id}/doctor-notes/",
+    "method": "patch",
+    "tags": [
+      "Appointments"
+    ],
+    "summary": "Set doctor consultation notes"
+  },
+  {
+    "path": "/api/v1/appointments/{id}/reschedule/",
+    "method": "patch",
+    "tags": [
+      "Appointments"
+    ],
+    "summary": "Reschedule an appointment"
+  },
+  {
+    "path": "/api/v1/appointments/{id}/status/",
+    "method": "post",
+    "tags": [
+      "Appointments"
+    ],
+    "summary": "Change appointment status"
+  },
+  {
+    "path": "/api/v1/health/pregnancy-progress/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Get pregnancy progress"
+  },
+  {
+    "path": "/api/v1/health/blood-pressure/",
+    "method": "post",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Log a blood pressure reading"
+  },
+  {
+    "path": "/api/v1/health/blood-pressure/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "List blood pressure readings"
+  },
+  {
+    "path": "/api/v1/health/blood-pressure/{id}/",
+    "method": "delete",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Delete a blood pressure reading"
+  },
+  {
+    "path": "/api/v1/health/blood-pressure/{id}/",
+    "method": "patch",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Update a blood pressure reading"
+  },
+  {
+    "path": "/api/v1/health/blood-pressure/{id}/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Get a single blood pressure reading"
+  },
+  {
+    "path": "/api/v1/health/blood-pressure/{id}/",
+    "method": "put",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Replace a blood pressure reading"
+  },
+  {
+    "path": "/api/v1/health/blood-sugar/",
+    "method": "post",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Log a blood sugar reading"
+  },
+  {
+    "path": "/api/v1/health/blood-sugar/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "List blood sugar readings"
+  },
+  {
+    "path": "/api/v1/health/blood-sugar/{id}/",
+    "method": "delete",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Delete a blood sugar reading"
+  },
+  {
+    "path": "/api/v1/health/blood-sugar/{id}/",
+    "method": "patch",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Update a blood sugar reading"
+  },
+  {
+    "path": "/api/v1/health/blood-sugar/{id}/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Get a single blood sugar reading"
+  },
+  {
+    "path": "/api/v1/health/blood-sugar/{id}/",
+    "method": "put",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Replace a blood sugar reading"
+  },
+  {
+    "path": "/api/v1/health/symptoms/",
+    "method": "post",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Log today's (or any day's) symptoms \u2014 upserts"
+  },
+  {
+    "path": "/api/v1/health/symptoms/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "List symptom logs"
+  },
+  {
+    "path": "/api/v1/health/symptoms/{id}/",
+    "method": "delete",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Delete a symptom log"
+  },
+  {
+    "path": "/api/v1/health/symptoms/{id}/",
+    "method": "patch",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Update a symptom log"
+  },
+  {
+    "path": "/api/v1/health/symptoms/{id}/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Get a single day's symptom log"
+  },
+  {
+    "path": "/api/v1/health/symptoms/{id}/",
+    "method": "put",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Replace a symptom log"
+  },
+  {
+    "path": "/api/v1/health/water-intake/",
+    "method": "post",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Log a water intake entry"
+  },
+  {
+    "path": "/api/v1/health/water-intake/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "List water intake entries (full history)"
+  },
+  {
+    "path": "/api/v1/health/water-intake/today/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Today's water intake total"
+  },
+  {
+    "path": "/api/v1/health/water-intake/{id}/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Get a single water intake entry"
+  },
+  {
+    "path": "/api/v1/health/kick-sessions/",
+    "method": "post",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Start a kick-count session"
+  },
+  {
+    "path": "/api/v1/health/kick-sessions/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "List kick-count sessions (history)"
+  },
+  {
+    "path": "/api/v1/health/kick-sessions/{id}/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Get a single kick-count session"
+  },
+  {
+    "path": "/api/v1/health/kick-sessions/{id}/end/",
+    "method": "post",
+    "tags": [
+      "Health"
+    ],
+    "summary": "End a kick-count session"
+  },
+  {
+    "path": "/api/v1/health/kick-sessions/{id}/tap/",
+    "method": "post",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Record one kick"
+  },
+  {
+    "path": "/api/v1/health/baby-size/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "List baby-size-by-week reference data"
+  },
+  {
+    "path": "/api/v1/health/baby-size/{week}/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Get baby size for a specific week"
+  },
+  {
+    "path": "/api/v1/health/surgical-procedures/",
+    "method": "post",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Log a surgical procedure"
+  },
+  {
+    "path": "/api/v1/health/surgical-procedures/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "List surgical procedure records"
+  },
+  {
+    "path": "/api/v1/health/surgical-procedures/{id}/",
+    "method": "delete",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Delete a surgical procedure record"
+  },
+  {
+    "path": "/api/v1/health/surgical-procedures/{id}/",
+    "method": "patch",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Update a surgical procedure record"
+  },
+  {
+    "path": "/api/v1/health/surgical-procedures/{id}/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Get a single surgical procedure record"
+  },
+  {
+    "path": "/api/v1/health/surgical-procedures/{id}/",
+    "method": "put",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Replace a surgical procedure record"
+  },
+  {
+    "path": "/api/v1/health/exercise-videos/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "List pregnancy exercise & breathing videos"
+  },
+  {
+    "path": "/api/v1/health/exercise-videos/{id}/",
+    "method": "get",
+    "tags": [
+      "Health"
+    ],
+    "summary": "Get a single video's details"
+  },
+  {
+    "path": "/api/v1/diet/plans/",
+    "method": "post",
+    "tags": [
+      "Diet"
+    ],
+    "summary": "Create a diet plan (doctor/admin only)"
+  },
+  {
+    "path": "/api/v1/diet/plans/",
+    "method": "get",
+    "tags": [
+      "Diet"
+    ],
+    "summary": "List diet plans"
+  },
+  {
+    "path": "/api/v1/diet/plans/active/",
+    "method": "get",
+    "tags": [
+      "Diet"
+    ],
+    "summary": "Get the current active diet plan"
+  },
+  {
+    "path": "/api/v1/diet/plans/{id}/",
+    "method": "delete",
+    "tags": [
+      "Diet"
+    ],
+    "summary": "Delete a diet plan (doctor/admin only)"
+  },
+  {
+    "path": "/api/v1/diet/plans/{id}/",
+    "method": "patch",
+    "tags": [
+      "Diet"
+    ],
+    "summary": "Update a diet plan (doctor/admin only)"
+  },
+  {
+    "path": "/api/v1/diet/plans/{id}/",
+    "method": "get",
+    "tags": [
+      "Diet"
+    ],
+    "summary": "Get a single diet plan"
+  },
+  {
+    "path": "/api/v1/diet/plans/{id}/",
+    "method": "put",
+    "tags": [
+      "Diet"
+    ],
+    "summary": "Replace a diet plan (doctor/admin only)"
+  },
+  {
+    "path": "/api/v1/medicines/reminders/",
+    "method": "post",
+    "tags": [
+      "Medicines"
+    ],
+    "summary": "Create a medicine reminder"
+  },
+  {
+    "path": "/api/v1/medicines/reminders/",
+    "method": "get",
+    "tags": [
+      "Medicines"
+    ],
+    "summary": "List medicine reminders"
+  },
+  {
+    "path": "/api/v1/medicines/reminders/{id}/",
+    "method": "delete",
+    "tags": [
+      "Medicines"
+    ],
+    "summary": "Delete a medicine reminder"
+  },
+  {
+    "path": "/api/v1/medicines/reminders/{id}/",
+    "method": "patch",
+    "tags": [
+      "Medicines"
+    ],
+    "summary": "Update a medicine reminder"
+  },
+  {
+    "path": "/api/v1/medicines/reminders/{id}/",
+    "method": "get",
+    "tags": [
+      "Medicines"
+    ],
+    "summary": "Get a single medicine reminder"
+  },
+  {
+    "path": "/api/v1/medicines/reminders/{id}/",
+    "method": "put",
+    "tags": [
+      "Medicines"
+    ],
+    "summary": "Replace a medicine reminder"
+  },
+  {
+    "path": "/api/v1/medicines/reminders/{id}/log-intake/",
+    "method": "post",
+    "tags": [
+      "Medicines"
+    ],
+    "summary": "Log a dose as taken/skipped"
+  },
+  {
+    "path": "/api/v1/medicines/intake-logs/",
+    "method": "get",
+    "tags": [
+      "Medicines"
+    ],
+    "summary": "List medicine intake logs (adherence history)"
+  },
+  {
+    "path": "/api/v1/medicines/intake-logs/{id}/",
+    "method": "get",
+    "tags": [
+      "Medicines"
+    ],
+    "summary": "Get a single intake log entry"
+  },
+  {
+    "path": "/api/v1/notifications/broadcast/",
+    "method": "post",
+    "tags": [
+      "Notifications"
+    ],
+    "summary": "Broadcast a notification (admin only)"
+  },
+  {
+    "path": "/api/v1/notifications/send-to-patient/",
+    "method": "post",
+    "tags": [
+      "Notifications"
+    ],
+    "summary": "Send an ad-hoc message to a patient (doctor only)"
+  },
+  {
+    "path": "/api/v1/notifications/",
+    "method": "get",
+    "tags": [
+      "Notifications"
+    ],
+    "summary": "List my notifications (inbox)"
+  },
+  {
+    "path": "/api/v1/notifications/mark-all-read/",
+    "method": "post",
+    "tags": [
+      "Notifications"
+    ],
+    "summary": "Mark all my notifications as read"
+  },
+  {
+    "path": "/api/v1/notifications/{id}/",
+    "method": "get",
+    "tags": [
+      "Notifications"
+    ],
+    "summary": "Get a single notification"
+  },
+  {
+    "path": "/api/v1/notifications/{id}/mark-read/",
+    "method": "post",
+    "tags": [
+      "Notifications"
+    ],
+    "summary": "Mark one notification as read"
+  },
+  {
+    "path": "/api/v1/hospitals/nearby/",
+    "method": "get",
+    "tags": [
+      "Hospitals"
+    ],
+    "summary": "Find nearby hospitals"
+  },
+  {
+    "path": "/api/v1/ai/sessions/",
+    "method": "post",
+    "tags": [
+      "AI Assistant"
+    ],
+    "summary": "Start a new chat session"
+  },
+  {
+    "path": "/api/v1/ai/sessions/",
+    "method": "get",
+    "tags": [
+      "AI Assistant"
+    ],
+    "summary": "List my chat sessions"
+  },
+  {
+    "path": "/api/v1/ai/sessions/{id}/",
+    "method": "get",
+    "tags": [
+      "AI Assistant"
+    ],
+    "summary": "Get a single chat session"
+  },
+  {
+    "path": "/api/v1/ai/sessions/{id}/messages/",
+    "method": "post",
+    "tags": [
+      "AI Assistant"
+    ],
+    "summary": "Get history / send a message"
+  },
+  {
+    "path": "/api/v1/ai/sessions/{id}/messages/",
+    "method": "get",
+    "tags": [
+      "AI Assistant"
+    ],
+    "summary": "Get history / send a message"
+  },
+  {
+    "path": "/api/v1/reports/patient-summary/",
+    "method": "get",
+    "tags": [
+      "Reports"
+    ],
+    "summary": "Patient health summary"
+  },
+  {
+    "path": "/api/v1/reports/admin/stats/",
+    "method": "get",
+    "tags": [
+      "Reports"
+    ],
+    "summary": "System-wide statistics / dashboard (admin only)"
+  },
+  {
+    "path": "/api/v1/reports/search/",
+    "method": "get",
+    "tags": [
+      "Reports"
+    ],
+    "summary": "Global search across doctors, patients, and appointments (admin only)"
+  },
+  {
+    "path": "/api/v1/emergency/sos/",
+    "method": "post",
+    "tags": [
+      "Emergency"
+    ],
+    "summary": "Trigger an emergency SOS"
+  },
+  {
+    "path": "/api/v1/emergency/sos/",
+    "method": "get",
+    "tags": [
+      "Emergency"
+    ],
+    "summary": "List SOS events"
+  },
+  {
+    "path": "/api/v1/emergency/sos/{id}/",
+    "method": "get",
+    "tags": [
+      "Emergency"
+    ],
+    "summary": "Get a single SOS event"
+  },
+  {
+    "path": "/api/v1/emergency/sos/{id}/resolve/",
+    "method": "post",
+    "tags": [
+      "Emergency"
+    ],
+    "summary": "Resolve or dismiss an SOS event"
+  }
+]
