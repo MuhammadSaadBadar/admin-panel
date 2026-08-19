@@ -4,6 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/color_constants.dart';
 import '../../../core/routes/route_names.dart';
+import '../../../core/utils/password_validator.dart';
+import '../../../core/widgets/dashboard_background.dart';
+import '../../../core/widgets/password_requirements_checklist.dart';
 import '../controllers/patient_registration_controller.dart';
 
 class RegisterPatientScreen extends StatefulWidget {
@@ -92,70 +95,129 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
         _lastNameController.text.isNotEmpty &&
         _emailController.text.isNotEmpty &&
         _phoneController.text.isNotEmpty &&
-        _passwordController.text.length >= 8 &&
+        PasswordValidator.isStrong(_passwordController.text) &&
         _consentChecked;
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isMobile = MediaQuery.of(context).size.width < 768;
+
     return Scaffold(
-      backgroundColor: ColorConstants.background,
-      body: Column(
-        children: [
-          _buildTopAppBar(),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: Column(
-                  children: [const SizedBox(height: 80), _buildMainContent()],
+      backgroundColor: ColorConstants.scaffoldBackground,
+      body: DashboardBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildTopAppBar(isMobile),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.all(isMobile ? 16 : 24),
+                  child: FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: Column(
+                      children: [
+                        SizedBox(height: isMobile ? 40 : 80),
+                        _buildMainContent(isMobile),
+                      ],
+                    ),
+                  ),
                 ),
+              ),
+              _buildFooter(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopAppBar(bool isMobile) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 24,
+        vertical: 16,
+      ),
+      decoration: BoxDecoration(
+        color: ColorConstants.dashboardPanel.withOpacity(0.60),
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(20),
+          bottomRight: Radius.circular(20),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: ColorConstants.dashboardShadow.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: ColorConstants.dashboardPink.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              onPressed: () => Get.back(),
+              icon: Icon(
+                Icons.arrow_back,
+                color: ColorConstants.dashboardInk,
+                size: 22,
               ),
             ),
           ),
-          _buildFooter(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTopAppBar() {
-    return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: ColorConstants.surface.withOpacity(0.8),
-        border: Border(bottom: BorderSide(color: ColorConstants.borderWhite10)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: () => Get.back(),
-                icon: Icon(
-                  Icons.arrow_back,
-                  color: ColorConstants.onSurfaceVariant,
-                ),
-              ),
-              Text(
-                'Register Patient',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w600,
-                  color: ColorConstants.onSurface,
-                ),
-              ),
-            ],
+          const SizedBox(width: 12),
+          Text(
+            'Register Patient',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: isMobile ? 20 : 24,
+              fontWeight: FontWeight.w700,
+              color: ColorConstants.dashboardInk,
+            ),
           ),
+          const Spacer(),
+          if (!isMobile)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: ColorConstants.dashboardTeal.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: ColorConstants.dashboardTeal,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'NEW',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: ColorConstants.dashboardTeal,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildMainContent() {
+  Widget _buildMainContent(bool isMobile) {
     return Container(
       constraints: const BoxConstraints(maxWidth: 672),
       margin: const EdgeInsets.symmetric(horizontal: 8),
@@ -164,28 +226,43 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
           // Description
           Container(
             margin: const EdgeInsets.only(bottom: 24),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: ColorConstants.dashboardCream,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: ColorConstants.dashboardLine, width: 1),
+            ),
             child: Text(
               'Onboard a new expectant mother to the system. All information is encrypted and handled according to clinical privacy standards.',
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 16,
+                fontSize: isMobile ? 14 : 16,
                 fontWeight: FontWeight.w400,
-                color: ColorConstants.onSurfaceVariant,
+                color: ColorConstants.dashboardInkSoft,
               ),
               textAlign: TextAlign.center,
             ),
           ),
           // Form Card
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(isMobile ? 16 : 24),
             decoration: BoxDecoration(
-              color: ColorConstants.cardBackground.withOpacity(0.7),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: ColorConstants.borderWhite10),
+              color: ColorConstants
+                  .primaryContainer, // Changed from dashboardPanel
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: ColorConstants.onPrimaryContainer.withOpacity(
+                  0.2,
+                ), // Subtle border
+                width: 1,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
+                  color: ColorConstants.onPrimaryContainer.withOpacity(
+                    0.1,
+                  ), // Adjusted shadow
                   blurRadius: 20,
                   spreadRadius: 4,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
@@ -195,44 +272,71 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
                 // Title
                 Row(
                   children: [
-                    Icon(
-                      Icons.person_add,
-                      color: ColorConstants.primary,
-                      size: 24,
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            ColorConstants.primary,
+                            ColorConstants.secondary,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.person_add,
+                        color: ColorConstants.onPrimary, // Changed to onPrimary
+                        size: 22,
+                      ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 12),
                     Text(
                       'Personal Information',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 20,
+                        fontSize: isMobile ? 18 : 20,
                         fontWeight: FontWeight.w600,
-                        color: ColorConstants.primary,
+                        color: ColorConstants
+                            .onPrimaryContainer, // Changed to onPrimaryContainer
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 // First & Last Name
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildFormField(
-                        label: 'First Name',
-                        controller: _firstNameController,
-                        hintText: 'e.g. Sarah',
-                        fieldKey: 'firstName',
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildFormField(
-                        label: 'Last Name',
-                        controller: _lastNameController,
-                        hintText: 'e.g. Jenkins',
-                        fieldKey: 'lastName',
-                      ),
-                    ),
-                  ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final firstNameField = _buildFormField(
+                      label: 'First Name',
+                      controller: _firstNameController,
+                      hintText: 'e.g. Sarah',
+                      fieldKey: 'firstName',
+                    );
+                    final lastNameField = _buildFormField(
+                      label: 'Last Name',
+                      controller: _lastNameController,
+                      hintText: 'e.g. Jenkins',
+                      fieldKey: 'lastName',
+                    );
+
+                    if (constraints.maxWidth < 420) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          firstNameField,
+                          const SizedBox(height: 16),
+                          lastNameField,
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: firstNameField),
+                        const SizedBox(width: 16),
+                        Expanded(child: lastNameField),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 // Email
@@ -249,7 +353,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
                 _buildFormField(
                   label: 'Phone Number',
                   controller: _phoneController,
-                  hintText: '+1 (555) 000-0000',
+                  hintText: '03000000000',
                   fieldKey: 'phoneNumber',
                   prefixIcon: Icons.call,
                   keyboardType: TextInputType.phone,
@@ -259,7 +363,12 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
                 _buildPasswordField(),
                 const SizedBox(height: 24),
                 // Divider
-                Divider(height: 1, color: ColorConstants.borderWhite5),
+                Divider(
+                  height: 1,
+                  color: ColorConstants.onPrimaryContainer.withOpacity(
+                    0.2,
+                  ), // Updated divider color
+                ),
                 const SizedBox(height: 16),
                 // Consent Checkbox
                 Row(
@@ -271,14 +380,14 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
                           _consentChecked = value ?? false;
                         });
                       },
-                      activeColor: ColorConstants.primary,
-                      checkColor: ColorConstants.onPrimary,
+                      activeColor: ColorConstants.dashboardPink,
+                      checkColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       side: BorderSide(
-                        color: ColorConstants.borderWhite10,
-                        width: 1,
+                        color: ColorConstants.dashboardLine,
+                        width: 1.5,
                       ),
                     ),
                     Expanded(
@@ -293,7 +402,8 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: ColorConstants.onSurfaceVariant,
+                            color: ColorConstants.onPrimaryContainer
+                                .withOpacity(0.8), // Updated text color
                           ),
                         ),
                       ),
@@ -306,15 +416,23 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
               ],
             ),
           ),
+
           const SizedBox(height: 24),
           // HIPAA Compliance
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.verified_user,
-                color: ColorConstants.tertiary,
-                size: 16,
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: ColorConstants.dashboardTeal.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.verified_user,
+                  color: ColorConstants.dashboardTeal,
+                  size: 16,
+                ),
               ),
               const SizedBox(width: 8),
               Text(
@@ -323,7 +441,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.05,
-                  color: ColorConstants.tertiary,
+                  color: ColorConstants.dashboardTeal,
                 ),
               ),
             ],
@@ -353,21 +471,43 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
           style: GoogleFonts.plusJakartaSans(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: ColorConstants.onSurfaceVariant,
+            color: ColorConstants.onPrimaryContainer.withOpacity(
+              0.8,
+            ), // Updated label color
           ),
         ),
         const SizedBox(height: 4),
         Container(
           decoration: BoxDecoration(
-            color: ColorConstants.surfaceContainer,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: ColorConstants.borderWhite10),
+            color: ColorConstants.onPrimary.withOpacity(
+              0.1,
+            ), // Light background on primary container
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: ColorConstants.onPrimaryContainer.withOpacity(
+                0.3,
+              ), // Subtle border
+              width: 1,
+            ),
           ),
           child: Row(
             children: [
               if (prefixIcon != null) ...[
-                const SizedBox(width: 12),
-                Icon(prefixIcon, color: ColorConstants.borderWhite5, size: 20),
+                const SizedBox(width: 8),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: ColorConstants.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    prefixIcon,
+                    color: ColorConstants.primary, // Changed to primary
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 8),
               ],
               Expanded(
                 child: TextField(
@@ -375,21 +515,22 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
                   obscureText: obscureText,
                   keyboardType: keyboardType,
                   onChanged: (_) {
-                    // Rebuild so the submit button re-evaluates `_isFormValid`
-                    // live as the user corrects previously invalid input.
                     setState(() {});
                   },
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
-                    color: ColorConstants.onSurface,
+                    color: ColorConstants
+                        .onPrimaryContainer, // Text color on primary container
                   ),
                   decoration: InputDecoration(
                     hintText: hintText,
                     hintStyle: GoogleFonts.plusJakartaSans(
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
-                      color: ColorConstants.borderWhite5.withOpacity(0.5),
+                      color: ColorConstants.onPrimaryContainer.withOpacity(
+                        0.5,
+                      ), // Hint text
                     ),
                     border: InputBorder.none,
                     isDense: true,
@@ -410,7 +551,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
             style: GoogleFonts.plusJakartaSans(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: ColorConstants.error,
+              color: ColorConstants.error, // Keep error as is
             ),
           ),
         ],
@@ -425,44 +566,62 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '********',
+          'Password',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: ColorConstants.onSurfaceVariant,
+            color: ColorConstants.onPrimaryContainer.withOpacity(
+              0.8,
+            ), // Updated label
           ),
         ),
         const SizedBox(height: 4),
         Container(
           decoration: BoxDecoration(
-            color: ColorConstants.surfaceContainer,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: ColorConstants.borderWhite10),
+            color: ColorConstants.onPrimary.withOpacity(
+              0.1,
+            ), // Light background
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: ColorConstants.onPrimaryContainer.withOpacity(0.3),
+              width: 1,
+            ),
           ),
           child: Row(
             children: [
-              const SizedBox(width: 12),
-              Icon(Icons.lock, color: ColorConstants.borderWhite5, size: 20),
+              const SizedBox(width: 8),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: ColorConstants.secondary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.lock,
+                  color: ColorConstants.secondary, // Changed to secondary
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 8),
               Expanded(
                 child: TextField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
                   onChanged: (_) {
-                    // Rebuild so the submit button re-evaluates `_isFormValid`
-                    // live as the user corrects the password.
                     setState(() {});
                   },
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
-                    color: ColorConstants.onSurface,
+                    color: ColorConstants.onPrimaryContainer, // Text color
                   ),
                   decoration: InputDecoration(
-                    hintText: '********',
+                    hintText: 'Enter a strong password',
                     hintStyle: GoogleFonts.plusJakartaSans(
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
-                      color: ColorConstants.borderWhite5.withOpacity(0.5),
+                      color: ColorConstants.onPrimaryContainer.withOpacity(0.5),
                     ),
                     border: InputBorder.none,
                     isDense: true,
@@ -481,7 +640,9 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
                 },
                 icon: Icon(
                   _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                  color: ColorConstants.borderWhite5,
+                  color: ColorConstants.onPrimaryContainer.withOpacity(
+                    0.7,
+                  ), // Updated
                   size: 20,
                 ),
                 padding: const EdgeInsets.all(8),
@@ -490,14 +651,19 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
             ],
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
+        // Real-time password-strength checklist
+        PasswordRequirementsChecklist(password: _passwordController.text),
+        const SizedBox(height: 8),
         Text(
           'Patient will be prompted to change this upon first login.',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 12,
             fontWeight: FontWeight.w400,
             fontStyle: FontStyle.italic,
-            color: ColorConstants.borderWhite5,
+            color: ColorConstants.onPrimaryContainer.withOpacity(
+              0.7,
+            ), // Updated
           ),
         ),
         if (passwordError != null) ...[
@@ -507,7 +673,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
             style: GoogleFonts.plusJakartaSans(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: ColorConstants.error,
+              color: ColorConstants.error, // Keep error as is
             ),
           ),
         ],
@@ -519,49 +685,73 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
     final bool isLoading = _registrationController.isLoading.value;
     return SizedBox(
       width: double.infinity,
-      child: ElevatedButton(
-        onPressed: isLoading || !_isFormValid ? null : _handleRegister,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: ColorConstants.primaryContainer,
-          foregroundColor: ColorConstants.onPrimaryContainer,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          elevation: 4,
-          shadowColor: ColorConstants.primary.withOpacity(0.2),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: _isFormValid && !isLoading
+              ? LinearGradient(
+                  colors: [ColorConstants.onPrimary, ColorConstants.onPrimary],
+                )
+              : null,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: _isFormValid && !isLoading
+              ? [
+                  BoxShadow(
+                    color: ColorConstants.dashboardPink.withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ]
+              : null,
         ),
-        child: isLoading
-            ? Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        ColorConstants.onPrimaryContainer,
+        child: ElevatedButton(
+          onPressed: isLoading || !_isFormValid ? null : _handleRegister,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _isFormValid && !isLoading
+                ? Colors.transparent
+                : ColorConstants.onPrimary.withOpacity(0.1),
+            foregroundColor: _isFormValid && !isLoading
+                ? Colors.white
+                : ColorConstants.onPrimary.withOpacity(0.4),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 0,
+          ),
+          child: isLoading
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Processing...',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: ColorConstants.onPrimaryContainer,
+                    const SizedBox(width: 12),
+                    Text(
+                      'Processing...',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
                     ),
+                  ],
+                )
+              : Text(
+                  'Register Patient',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: _isFormValid && !isLoading
+                        ? Colors.white
+                        : ColorConstants.onPrimary.withOpacity(0.4),
                   ),
-                ],
-              )
-            : Text(
-                'Register Patient',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: ColorConstants.onPrimaryContainer,
                 ),
-              ),
+        ),
       ),
     );
   }
@@ -570,17 +760,17 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
-        color: ColorConstants.background,
-        border: Border(top: BorderSide(color: ColorConstants.borderWhite5)),
+        color: ColorConstants.dashboardPanel.withOpacity(0.60),
+        border: Border(top: BorderSide(color: ColorConstants.dashboardLine)),
       ),
       child: Column(
         children: [
           Text(
-            '© 2024 Mama Health Pro • Secure Administrative Environment',
+            '© Mama Health • Secure Administrative Environment',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: ColorConstants.onSurfaceVariant,
+              color: ColorConstants.dashboardInkSoft,
             ),
           ),
           const SizedBox(height: 8),
@@ -606,8 +796,8 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
           'Coming Soon',
           '$text will be available soon.',
           snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: ColorConstants.cardBackground,
-          colorText: ColorConstants.onSurface,
+          backgroundColor: ColorConstants.dashboardPanel,
+          colorText: ColorConstants.dashboardInk,
         );
       },
       child: Text(
@@ -615,7 +805,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
         style: GoogleFonts.plusJakartaSans(
           fontSize: 12,
           fontWeight: FontWeight.w500,
-          color: ColorConstants.borderWhite5,
+          color: ColorConstants.dashboardInkSoft.withOpacity(0.6),
         ),
       ),
     );
@@ -651,7 +841,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
           'Registration Failed',
           message,
           snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: ColorConstants.cardBackground,
+          backgroundColor: ColorConstants.dashboardPanel,
           colorText: ColorConstants.error,
           duration: const Duration(seconds: 5),
         );
@@ -669,17 +859,34 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
     if (!mounted) return;
     Get.dialog(
       AlertDialog(
-        backgroundColor: ColorConstants.cardBackground,
+        backgroundColor: ColorConstants.dashboardPanel,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Column(
           children: [
-            Icon(Icons.check_circle, color: ColorConstants.tertiary, size: 48),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    ColorConstants.dashboardTeal,
+                    ColorConstants.dashboardTeal2,
+                  ],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_circle,
+                color: Colors.white,
+                size: 32,
+              ),
+            ),
             const SizedBox(height: 12),
             Text(
               'Registered!',
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 20,
+                fontSize: 22,
                 fontWeight: FontWeight.w700,
-                color: ColorConstants.onSurface,
+                color: ColorConstants.dashboardInk,
               ),
             ),
           ],
@@ -689,30 +896,48 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
           style: GoogleFonts.plusJakartaSans(
             fontSize: 14,
             fontWeight: FontWeight.w400,
-            color: ColorConstants.onSurfaceVariant,
+            color: ColorConstants.dashboardInkSoft,
           ),
           textAlign: TextAlign.center,
         ),
         actions: [
-          TextButton(
-            onPressed: () {
-              Get.back(); // Close dialog
-              // Navigate to patient management
-              Get.offNamed(RouteNames.patients);
-            },
-            child: Text(
-              'View All Patients',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: ColorConstants.primary,
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  ColorConstants.dashboardPink,
+                  ColorConstants.dashboardPink2,
+                ],
+              ),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: TextButton(
+              onPressed: () {
+                Get.back(); // Close dialog
+                Get.offNamed(RouteNames.patients);
+              },
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: Text(
+                'View All Patients',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
+          const SizedBox(height: 8),
           TextButton(
             onPressed: () {
               Get.back(); // Close dialog
-              // Clear the form for the next registration — no default password.
+              // Clear the form for the next registration
               _firstNameController.clear();
               _lastNameController.clear();
               _emailController.clear();
@@ -729,8 +954,8 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen>
               'Register Another',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: ColorConstants.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+                color: ColorConstants.dashboardInkSoft,
               ),
             ),
           ),

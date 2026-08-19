@@ -9,17 +9,39 @@ class DashboardRepository {
 
   DashboardRepository(this._apiClient);
 
-  Future<DashboardStats> getStats() async {
+  /// Fetches the admin dashboard stats.
+  ///
+  /// Optionally accepts a `dateFrom` / `dateTo` range (formatted as
+  /// `YYYY-MM-DD`) which is passed to the backend as `date_from` / `date_to`
+  /// query params to filter the stats. When omitted, the call uses the default
+  /// (unfiltered) stats.
+  Future<DashboardStats> getStats({
+    DateTime? dateFrom,
+    DateTime? dateTo,
+  }) async {
     // Single source of truth: endpoint is defined in ApiConstants.
     // Do not duplicate this path in AppConstants or any other class.
     const path = ApiConstants.reportsAdminStats;
 
+    final Map<String, dynamic> queryParameters = {};
+    if (dateFrom != null) {
+      queryParameters['date_from'] = _formatDate(dateFrom);
+    }
+    if (dateTo != null) {
+      queryParameters['date_to'] = _formatDate(dateTo);
+    }
+
     debugPrint('[DashboardRepo] Stats request start — path=$path');
-    debugPrint('[DashboardRepo] Auth header will be attached by AuthInterceptor.');
-    debugPrint('[DashboardRepo] Query params: none');
+    debugPrint(
+      '[DashboardRepo] Auth header will be attached by AuthInterceptor.',
+    );
+    debugPrint('[DashboardRepo] Query params: $queryParameters');
 
     try {
-      final response = await _apiClient.get(path);
+      final response = await _apiClient.get(
+        path,
+        queryParameters: queryParameters.isEmpty ? null : queryParameters,
+      );
       debugPrint(
         '[DashboardRepo] Stats response received — status=${response.statusCode}',
       );
@@ -36,9 +58,7 @@ class DashboardRepository {
         );
       }
 
-      final parsed = DashboardStats.fromJson(
-        Map<String, dynamic>.from(data as Map),
-      );
+      final parsed = DashboardStats.fromJson(Map<String, dynamic>.from(data));
       debugPrint(
         '[DashboardRepo] Stats parsed successfully — '
         'doctors=${parsed.totalDoctors} patients=${parsed.totalPatients} '
@@ -55,5 +75,14 @@ class DashboardRepository {
       debugPrint('[DashboardRepo] Failure response body=${e.response?.data}');
       rethrow;
     }
+  }
+
+  /// Formats a [DateTime] as `YYYY-MM-DD` for the `date_from` / `date_to`
+  /// query parameters accepted by the dashboard stats endpoint.
+  String _formatDate(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
   }
 }

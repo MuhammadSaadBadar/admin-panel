@@ -15,8 +15,6 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final List<Widget>? actions;
   final bool showBackButton;
   final VoidCallback? onBackTap;
-  final bool showMenuButton;
-  final VoidCallback? onMenuTap;
 
   const CustomAppBar({
     super.key,
@@ -24,8 +22,6 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.actions,
     this.showBackButton = false,
     this.onBackTap,
-    this.showMenuButton = false,
-    this.onMenuTap,
   });
 
   // ── Preferred height: content height only.
@@ -74,27 +70,6 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 Expanded(
                   child: Row(
                     children: [
-                      if (showMenuButton)
-                        IconButton(
-                          onPressed:
-                              onMenuTap ??
-                              () {
-                                // Default: open the ancestor Scaffold's drawer.
-                                // Using this builder's context (a descendant
-                                // of the Scaffold) resolves correctly, unlike
-                                // passing a parent context from the screen.
-                                debugPrint(
-                                  '[CustomAppBar] Menu tap — opening drawer via '
-                                  'Scaffold lookup',
-                                );
-                                Scaffold.of(context).openDrawer();
-                              },
-                          icon: const Icon(
-                            Icons.menu,
-                            color: ColorConstants.primary,
-                          ),
-                          tooltip: 'Open navigation menu',
-                        ),
                       if (showBackButton)
                         IconButton(
                           onPressed: onBackTap ?? () => Get.back(),

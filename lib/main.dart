@@ -21,7 +21,7 @@ class MamaHealthProApp extends StatelessWidget {
     return GetMaterialApp(
       title: 'Mama Health',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme,
       initialBinding: InitialBinding(),
       initialRoute: RouteNames.root,
       // GetX handles routing — no onGenerateRoute or navigatorKey needed.

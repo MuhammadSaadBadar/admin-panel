@@ -426,10 +426,15 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
                 ),
                 const SizedBox(height: 24),
                 // OTP Input Fields
+                // Each field is wrapped in Expanded so the 6 boxes flex to fit
+                // the available width instead of being fixed at 64px wide —
+                // fixed widths caused a ~100px RenderFlex overflow on narrow
+                // phones (6 × 64 = 384px > ~280px available).
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: List.generate(6, (index) {
-                    return _buildOtpField(index);
+                    return Expanded(
+                      child: _buildOtpField(index, hasRightMargin: index < 5),
+                    );
                   }),
                 ),
                 const SizedBox(height: 20),
@@ -449,49 +454,55 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen>
     );
   }
 
-  Widget _buildOtpField(int index) {
-    return SizedBox(
-      width: 64,
-      height: 80,
-      child: TextField(
-        controller: _otpControllers[index],
-        focusNode: _focusNodes[index],
-        textAlign: TextAlign.center,
-        maxLength: 1,
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 32,
-          fontWeight: FontWeight.w700,
-          color: ColorConstants.primary,
-        ),
-        decoration: InputDecoration(
-          counterText: '',
-          filled: true,
-          fillColor: ColorConstants.surfaceContainerHigh,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: ColorConstants.borderWhite10),
+  Widget _buildOtpField(int index, {bool hasRightMargin = true}) {
+    // Use a square box that scales with the available width (via
+    // aspectRatio(1)) and the parent's Expanded flex, instead of a fixed
+    // 64×80 box. On a narrow phone this keeps all six fields visible without
+    // overflowing the card. The right margin provides the inter-field gap.
+    return Padding(
+      padding: EdgeInsets.only(right: hasRightMargin ? 8 : 0),
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: TextField(
+          controller: _otpControllers[index],
+          focusNode: _focusNodes[index],
+          textAlign: TextAlign.center,
+          maxLength: 1,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+            color: ColorConstants.primary,
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: ColorConstants.borderWhite10),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(
-              color: ColorConstants.primaryContainer,
-              width: 2,
+          decoration: InputDecoration(
+            counterText: '',
+            filled: true,
+            fillColor: ColorConstants.surfaceContainerHigh,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: ColorConstants.borderWhite10),
             ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: ColorConstants.borderWhite10),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: ColorConstants.primaryContainer,
+                width: 2,
+              ),
+            ),
+            contentPadding: EdgeInsets.zero,
           ),
-          contentPadding: EdgeInsets.zero,
+          onChanged: (value) {
+            _handleOtpInput(value, index);
+          },
+          onTap: () {
+            _focusNodes[index].requestFocus();
+          },
         ),
-        onChanged: (value) {
-          _handleOtpInput(value, index);
-        },
-        onTap: () {
-          _focusNodes[index].requestFocus();
-        },
       ),
     );
   }

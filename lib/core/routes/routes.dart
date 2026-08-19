@@ -3,8 +3,19 @@ import 'package:admin/features/appointments/screens/appointments_dashboard_scree
 import 'package:admin/features/auth/screens/auth_gate_screen.dart';
 import 'package:admin/features/auth/screens/otp_verification_screen.dart';
 import 'package:admin/features/auth/screens/reset_password_screen.dart';
+import 'package:admin/features/notifications/screens/compose_broadcast_screen.dart';
+import 'package:admin/features/notifications/screens/notification_detail_screen.dart';
+import 'package:admin/features/notifications/screens/notifications_screen.dart';
 import 'package:admin/features/patients/screens/assign_doctor_screen.dart';
+import 'package:admin/features/patients/screens/create_diet_plan_screen.dart';
+import 'package:admin/features/patients/screens/diet_plan_management_screen.dart';
+import 'package:admin/features/patients/screens/medication_editor_screen.dart';
+import 'package:admin/features/patients/screens/medication_history_screen.dart';
+import 'package:admin/features/patients/screens/medication_intake_detail_screen.dart';
+import 'package:admin/features/patients/screens/medication_reminders_screen.dart';
 import 'package:admin/features/patients/screens/patient_register_screen.dart';
+import 'package:admin/features/sos/screens/emergency_sos_detail_screen.dart';
+import 'package:admin/features/sos/screens/emergency_sos_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -97,6 +108,42 @@ class AppRoutes {
       transitionDuration: const Duration(milliseconds: 250),
     ),
     GetPage(
+      name: RouteNames.dietPlans,
+      page: () => const DietPlanManagementScreen(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 250),
+    ),
+    GetPage(
+      name: RouteNames.dietPlansCreate,
+      page: () => const CreateDietPlanScreen(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 250),
+    ),
+    GetPage(
+      name: RouteNames.medicationReminders,
+      page: () => const MedicationRemindersScreen(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 250),
+    ),
+    GetPage(
+      name: RouteNames.medicationEditor,
+      page: () => const MedicationEditorScreen(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 250),
+    ),
+    GetPage(
+      name: RouteNames.medicationHistory,
+      page: () => const MedicationHistoryScreen(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 250),
+    ),
+    GetPage(
+      name: RouteNames.medicationIntakeDetail,
+      page: () => const MedicationIntakeDetailScreen(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 250),
+    ),
+    GetPage(
       name: RouteNames.registerPatient,
       page: () => const RegisterPatientScreen(),
       transition: Transition.rightToLeft,
@@ -133,6 +180,18 @@ class AppRoutes {
       transition: Transition.rightToLeft,
       transitionDuration: const Duration(milliseconds: 250),
     ),
+    GetPage(
+      name: RouteNames.sos,
+      page: () => const EmergencySosScreen(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 250),
+    ),
+    GetPage(
+      name: RouteNames.sosDetail,
+      page: () => const EmergencySosDetailScreen(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 250),
+    ),
     // GetPage(
     //   name: RouteNames.reports,
     //   page: () {
@@ -157,10 +216,19 @@ class AppRoutes {
     ),
     GetPage(
       name: RouteNames.notifications,
-      page: () => const _ComingSoonScreen(
-        title: 'Notifications',
-        message: 'Notifications screen is not implemented yet.',
-      ),
+      page: () => const NotificationsScreen(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 250),
+    ),
+    GetPage(
+      name: RouteNames.notificationDetail,
+      page: () => const NotificationDetailScreen(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 250),
+    ),
+    GetPage(
+      name: RouteNames.notificationBroadcast,
+      page: () => const ComposeBroadcastScreen(),
       transition: Transition.rightToLeft,
       transitionDuration: const Duration(milliseconds: 250),
     ),

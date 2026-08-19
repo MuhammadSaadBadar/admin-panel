@@ -54,26 +54,40 @@ class PatientGrowthChart extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  'Activity Snapshot',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: isMobile ? 16 : 20,
-                    fontWeight: FontWeight.w600,
-                    color: ColorConstants.onSurface,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Activity Snapshot',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: isMobile ? 16 : 20,
+                        fontWeight: FontWeight.w600,
+                        color: ColorConstants.onSurface,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Month-to-date & last 7 days activity',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: isMobile ? 10 : 12,
+                        fontWeight: FontWeight.w400,
+                        color: ColorConstants.onSurfaceVariant,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
-              if (!isMobile) ...[
-                const ChartButton(label: 'Live', isActive: true),
-                const SizedBox(width: 4),
-                const ChartButton(label: 'Summary', isActive: false),
-              ],
+              if (!isMobile) _buildMaxLegend(),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isMobile ? 20 : 24),
           SizedBox(
-            height: 150,
+            // Height is derived from the tallest bar + its fixed vertical
+            // overhead (value label + gaps + axis labels) so the chart never
+            // overflows on compact screens regardless of the data scale.
+            height: _maxBarHeight + _barVerticalOverhead,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -85,84 +99,156 @@ class PatientGrowthChart extends StatelessWidget {
     );
   }
 
+  /// Fixed vertical overhead around each bar: value label (18) + gaps (2+6+1)
+  /// + axis label (~13) + sub-label (~12). Kept with a small tolerance buffer
+  /// so the ChartBar's internal Column never overflows across font renderers.
+  static const double _barVerticalOverhead = 60;
+
+  /// The tallest possible rendered bar. Bars scale to `32 + (normalized * 130)`,
+  /// so the tallest bar is `32 + 130 = 162` whenever any value is non-zero.
+  double get _maxBarHeight {
+    final maxValue = _values.fold<int>(0, (a, b) => a > b.value ? a : b.value);
+    return maxValue > 0 ? 162.0 : 4.0;
+  }
+
+  /// Small legend showing the largest count driving the scale.
+  Widget _buildMaxLegend() {
+    final maxValue = _values
+        .map((item) => item.value)
+        .fold<int>(0, (a, b) => a > b ? a : b);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: ColorConstants.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: ColorConstants.borderWhite10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.trending_up_rounded,
+            size: 14,
+            color: ColorConstants.primary,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            'Max $maxValue',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: ColorConstants.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<_MetricBar> get _values => [
+    _MetricBar('Patients', 'Total', stats?.totalPatients ?? 0),
+    _MetricBar('Doctors', 'Total', stats?.totalDoctors ?? 0),
+    _MetricBar('Appt.', 'All-time', stats?.totalAppointments ?? 0),
+    _MetricBar('Month', 'This month', stats?.appointmentsThisMonth ?? 0),
+    _MetricBar('Today', 'Today', stats?.todayAppointments ?? 0),
+    _MetricBar('New', '7 days', stats?.newPatientsThisWeek ?? 0),
+    _MetricBar('SOS', 'Active', stats?.activeSosEvents ?? 0),
+  ];
+
   List<Widget> _buildBars() {
-    final values = <_MetricBar>[
-      _MetricBar('Patients', stats?.totalPatients ?? 0),
-      _MetricBar('Doctors', stats?.totalDoctors ?? 0),
-      _MetricBar('Month', stats?.appointmentsThisMonth ?? 0),
-      _MetricBar('Today', stats?.todayAppointments ?? 0),
-      _MetricBar('New', stats?.newPatientsThisWeek ?? 0),
-      _MetricBar('SOS', stats?.activeSosEvents ?? 0),
-    ];
+    final values = _values;
     final maxValue = values
         .map((item) => item.value)
         .fold<int>(0, (a, b) => a > b ? a : b);
 
+    // The active (highlighted) bar is the one with the largest value, so the
+    // emphasis is meaningful rather than a hardcoded index.
+    final maxIndex = maxValue == 0
+        ? 0
+        : values.indexWhere((item) => item.value == maxValue);
+    final activeIndex = maxIndex < 0 ? 0 : maxIndex;
+
     return values.asMap().entries.map((entry) {
       final index = entry.key;
       final item = entry.value;
+      // No clamp floor: a zero value renders a minimal baseline, so zero-count
+      // metrics (e.g. SOS = 0) are visibly empty instead of appearing as a
+      // real bar. Bars with a positive value scale proportionally to maxValue.
       final normalized = maxValue == 0
-          ? 0.1
-          : (item.value / maxValue).clamp(0.1, 1.0);
+          ? 0.0
+          : (item.value / maxValue).clamp(0.0, 1.0);
       return ChartBar(
         label: item.label,
-        // Pass the actual API count so the tooltip shows real data.
+        subLabel: item.subLabel,
+        // Pass the actual API count so the value label shows real data.
         value: item.value,
-        height: 24 + (normalized * 100),
-        isActive: index == 2,
-        isLast: index == values.length - 1,
+        height: item.value == 0 ? 4 : 32 + (normalized * 130),
+        isActive: index == activeIndex,
       );
     }).toList();
   }
 }
 
+/// A single measured metric for the Activity Snapshot bar chart.
+class _MetricBar {
+  final String label;
+  final String subLabel;
+  final int value;
+
+  const _MetricBar(this.label, this.subLabel, this.value);
+}
+
 class ChartBar extends StatelessWidget {
   final String label;
+
+  /// Short time-window caption shown under the label (e.g. "This month").
+  final String subLabel;
   final double height;
-  /// The raw API count displayed in the tooltip when this bar is active.
+
+  /// The raw API count — always displayed above the bar so the value is
+  /// unambiguous regardless of the bar's normalized height.
   final int value;
   final bool isActive;
-  final bool isLast;
 
   const ChartBar({
     super.key,
     required this.label,
+    required this.subLabel,
     required this.height,
     required this.value,
     this.isActive = false,
-    this.isLast = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final Color barColor = isActive
         ? ColorConstants.primary
-        : ColorConstants.primary.withOpacity(isLast ? 0.1 : 0.2);
+        : ColorConstants.primary.withOpacity(0.2);
+    final bool hasValue = value > 0;
 
     return Expanded(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          if (isActive)
-            Container(
-              margin: const EdgeInsets.only(bottom: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              decoration: BoxDecoration(
-                color: ColorConstants.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              // Show the actual count from the API, not the pixel height.
-              child: Text(
-                '$value',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                  color: ColorConstants.onSurface,
-                ),
-              ),
-            ),
+          // Value label — shown on every bar (not just the active one).
+          SizedBox(
+            height: 18,
+            child: hasValue
+                ? Text(
+                    _format(value),
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                      color: isActive
+                          ? ColorConstants.primary
+                          : ColorConstants.onSurface,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(height: 2),
           Container(
-            width: 20,
+            width: 22,
             height: height,
             decoration: BoxDecoration(
               color: barColor,
@@ -183,50 +269,35 @@ class ChartBar extends StatelessWidget {
                   : null,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             label,
             style: GoogleFonts.plusJakartaSans(
               fontSize: 10,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
+              color: ColorConstants.onSurface,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 1),
+          Text(
+            subLabel,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 8.5,
+              fontWeight: FontWeight.w400,
               color: ColorConstants.onSurfaceVariant,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
     );
   }
-}
 
-class ChartButton extends StatelessWidget {
-  final String label;
-  final bool isActive;
-
-  const ChartButton({super.key, required this.label, required this.isActive});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        color: isActive
-            ? ColorConstants.surfaceContainerHigh
-            : Colors.transparent,
-        border: isActive
-            ? Border.all(color: ColorConstants.borderWhite10)
-            : null,
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: isActive
-              ? ColorConstants.onSurface
-              : ColorConstants.onSurfaceVariant,
-        ),
-      ),
+  String _format(int value) {
+    return value.toString().replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (match) => ',',
     );
   }
 }
@@ -380,13 +451,6 @@ class TrimesterDistributionChart extends StatelessWidget {
     if (total <= 0) return '0%';
     return '${((value / total) * 100).toStringAsFixed(0)}%';
   }
-}
-
-class _MetricBar {
-  final String label;
-  final int value;
-
-  const _MetricBar(this.label, this.value);
 }
 
 class TrimesterItem extends StatelessWidget {

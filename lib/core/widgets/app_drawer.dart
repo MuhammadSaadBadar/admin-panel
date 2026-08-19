@@ -72,15 +72,20 @@ class AppDrawer extends StatelessWidget {
                   route: RouteNames.appointments,
                 ),
                 _buildNavItem(
+                  icon: Icons.emergency_rounded,
+                  label: 'Emergency SOS',
+                  route: RouteNames.sos,
+                ),
+                _buildNavItem(
                   icon: Icons.notifications_rounded,
                   label: 'Notifications',
                   route: RouteNames.notifications,
                 ),
-                _buildNavItem(
-                  icon: Icons.settings_rounded,
-                  label: 'Settings',
-                  route: RouteNames.settings,
-                ),
+                // _buildNavItem(
+                //   icon: Icons.settings_rounded,
+                //   label: 'Settings',
+                //   route: RouteNames.settings,
+                // ),
                 _buildNavItem(
                   icon: Icons.person_rounded,
                   label: 'Profile',

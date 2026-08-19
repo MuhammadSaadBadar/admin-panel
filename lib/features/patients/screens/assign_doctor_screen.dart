@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/color_constants.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/widgets/dashboard_background.dart';
 import '../../doctors/models/doctor.dart';
 import '../../doctors/repositories/doctor_repository.dart';
 import '../controllers/assign_doctor_controller.dart';
@@ -78,28 +79,27 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
 
     return Scaffold(
       backgroundColor: ColorConstants.background,
-      body: Column(
-        children: [
-          _buildTopAppBar(isMobile),
-          Expanded(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: _buildBody(isMobile),
+      body: DashboardBackground(
+        child: Column(
+          children: [
+            _buildTopAppBar(isMobile),
+            Expanded(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: _buildBody(isMobile),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   // ── Body ──────────────────────────────────────────────────────────────
   Widget _buildBody(bool isMobile) {
-    // ✅ Use a Stack so loading/error overlays are NOT nested inside an Obx
-    // that also wraps the content. This avoids the GetX "improper use"
-    // error caused by overlapping reactive reads inside nested Obx widgets.
     return Stack(
       children: [
-        // Content always rendered (its reactive parts use their own Obx)
+        // Content always rendered
         _buildContent(isMobile),
 
         // Loading overlay
@@ -133,26 +133,26 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
     );
   }
 
-  // ── Content (No Obx wrapping the whole thing) ─────────────────────────
+  // ── Content ────────────────────────────────────────────────────────────
   Widget _buildContent(bool isMobile) {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(isMobile ? 12 : 24),
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSearchAndFilters(isMobile),
+          _buildSearchBar(isMobile),
           const SizedBox(height: 16),
-          // Reactive header info — its own top-level Obx
+          // Header with doctor count - using Obx for reactivity
           Obx(() => _buildHeaderInfo()),
           const SizedBox(height: 12),
-          // Reactive doctor list — its own top-level Obx
+          // Doctor list - using Obx for reactivity
           Obx(() => _buildDoctorList(isMobile)),
         ],
       ),
     );
   }
 
-  // ── Top App Bar ─────────────────────────────────────────────────────────
+  // ── Top App Bar ───────────────────────────────────────────────────────
   Widget _buildTopAppBar(bool isMobile) {
     return Container(
       height: 64,
@@ -185,7 +185,6 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
               ),
             ),
           ),
-          // ✅ Only this small part uses Obx
           Obx(() {
             if (_controller.isAssigning.value) {
               return const SizedBox(
@@ -204,7 +203,7 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
     );
   }
 
-  // ── Error State ─────────────────────────────────────────────────────────
+  // ── Error State ───────────────────────────────────────────────────────
   Widget _buildErrorState() {
     return Center(
       child: Padding(
@@ -238,96 +237,65 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
     );
   }
 
-  // ── Search & Filters ────────────────────────────────────────────────────
-  Widget _buildSearchAndFilters(bool isMobile) {
-    return Column(
-      children: [
-        // Search Bar
-        Container(
-          decoration: BoxDecoration(
-            color: ColorConstants.surfaceContainer,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: ColorConstants.borderWhite10),
+  // ── Search Bar ────────────────────────────────────────────────────────
+  Widget _buildSearchBar(bool isMobile) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: ColorConstants.cardBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ColorConstants.primary.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: ColorConstants.primary.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
-          child: Row(
-            children: [
-              const SizedBox(width: 16),
-              const Icon(
-                Icons.search,
-                color: ColorConstants.onSurfaceVariant,
-                size: 22,
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: ColorConstants.primaryContainer.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.search,
+              color: ColorConstants.primary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextField(
+              onChanged: (value) {
+                _controller.searchQuery.value = value;
+              },
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                color: ColorConstants.onSurface,
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  onChanged: (value) {
-                    _controller.searchQuery.value = value;
-                  },
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14,
-                    color: ColorConstants.onSurface,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Search doctors by name...',
-                    hintStyle: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      color: ColorConstants.onSurfaceVariant.withOpacity(0.5),
-                    ),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
+              decoration: InputDecoration(
+                hintText: 'Search doctors by name...',
+                hintStyle: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  color: ColorConstants.onSurfaceVariant.withOpacity(0.5),
                 ),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
               ),
-            ],
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
-        // City Filter Chips - ✅ Only filters use Obx
-        // Obx(
-        //   () => SizedBox(
-        //     height: 38,
-        //     child: ListView.separated(
-        //       scrollDirection: Axis.horizontal,
-        //       itemCount: AssignDoctorController.cities.length,
-        //       separatorBuilder: (_, __) => const SizedBox(width: 8),
-        //       itemBuilder: (context, index) {
-        //         final city = AssignDoctorController.cities[index];
-        //         final isSelected = _controller.selectedCity.value == city;
-        //         return ChoiceChip(
-        //           label: Text(city),
-        //           selected: isSelected,
-        //           onSelected: (_) => _controller.updateCity(city),
-        //           labelStyle: GoogleFonts.plusJakartaSans(
-        //             fontSize: 12,
-        //             fontWeight: FontWeight.w600,
-        //             color: isSelected
-        //                 ? ColorConstants.onPrimary
-        //                 : ColorConstants.onSurfaceVariant,
-        //           ),
-        //           selectedColor: ColorConstants.primary,
-        //           backgroundColor: ColorConstants.surfaceContainerHigh,
-        //           side: BorderSide(
-        //             color: isSelected
-        //                 ? ColorConstants.primary
-        //                 : ColorConstants.borderWhite10,
-        //           ),
-        //           shape: RoundedRectangleBorder(
-        //             borderRadius: BorderRadius.circular(8),
-        //           ),
-        //           showCheckmark: false,
-        //           padding: const EdgeInsets.symmetric(horizontal: 6),
-        //           visualDensity: VisualDensity.compact,
-        //         );
-        //       },
-        //     ),
-        //   ),
-        // ),
-      ],
+        ],
+      ),
     );
   }
 
-  // ── Header Info ─────────────────────────────────────────────────────────
+  // ── Header Info ───────────────────────────────────────────────────────
   Widget _buildHeaderInfo() {
     final filtered = _controller.filteredDoctors;
     final total = _controller.doctors.length;
@@ -343,14 +311,31 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
             color: ColorConstants.onSurface,
           ),
         ),
-        if (filtered.length != total) Text('${filtered.length} matching'),
+        if (filtered.length != total)
+          Text(
+            '${filtered.length} matching',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              color: ColorConstants.onSurfaceVariant,
+            ),
+          ),
       ],
     );
   }
 
-  // ── Doctor List ─────────────────────────────────────────────────────────
+  // ── Doctor List ───────────────────────────────────────────────────────
   Widget _buildDoctorList(bool isMobile) {
     final filtered = _controller.filteredDoctors;
+
+    // Debug print to verify data
+    debugPrint('[AssignDoctorScreen] Rendering ${filtered.length} doctors');
+    for (var doc in filtered) {
+      debugPrint(
+        '[AssignDoctorScreen] Doctor: ${doc.name}, '
+        'Specialization: ${doc.specialization}, '
+        'City: ${doc.city}',
+      );
+    }
 
     if (filtered.isEmpty) {
       return _buildEmptyState();
@@ -398,32 +383,33 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
     );
   }
 
-  // ── Doctor Card ─────────────────────────────────────────────────────────
+  // ── Doctor Card ───────────────────────────────────────────────────────
   Widget _buildDoctorCard(Doctor doctor, bool isMobile) {
     final isSelected = _controller.selectedDoctorId.value == doctor.id;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: EdgeInsets.all(isMobile ? 12 : 16),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
       decoration: BoxDecoration(
-        color: isSelected
-            ? ColorConstants.primaryContainer.withOpacity(0.08)
-            : ColorConstants.surfaceContainer,
+        color: ColorConstants.primary,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isSelected
-              ? ColorConstants.primary.withOpacity(0.5)
+              ? ColorConstants.primary
               : ColorConstants.borderWhite10,
-          width: isSelected ? 1.5 : 1,
+          width: isSelected ? 2 : 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: ColorConstants.dashboardShadow,
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => _controller.selectDoctor(doctor.id),
-        child: isMobile
-            ? _buildMobileDoctorLayout(doctor, isSelected)
-            : _buildDesktopDoctorLayout(doctor, isSelected),
-      ),
+      child: isMobile
+          ? _buildMobileDoctorLayout(doctor, isSelected)
+          : _buildDesktopDoctorLayout(doctor, isSelected),
     );
   }
 
@@ -444,11 +430,11 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: ColorConstants.onSurface,
+                      color: ColorConstants.onPrimary,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Text(
                     doctor.specialization.isNotEmpty
                         ? doctor.specialization
@@ -456,9 +442,7 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
-                      color: isSelected
-                          ? ColorConstants.primary
-                          : ColorConstants.tertiary,
+                      color: ColorConstants.onPrimary,
                     ),
                   ),
                 ],
@@ -467,7 +451,7 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
             _buildStatusBadge(doctor),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Row(
           children: [
             _buildInfoChip(Icons.location_on_outlined, doctor.city),
@@ -477,7 +461,7 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
             ],
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
           child: _buildAssignButton(doctor, isSelected),
@@ -505,7 +489,7 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Text(
                 doctor.specialization.isNotEmpty
                     ? doctor.specialization
@@ -513,12 +497,10 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: isSelected
-                      ? ColorConstants.primary
-                      : ColorConstants.tertiary,
+                  color: ColorConstants.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   _buildInfoChip(Icons.location_on_outlined, doctor.city),
@@ -541,7 +523,7 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
     );
   }
 
-  // ── Reusable Widgets ────────────────────────────────────────────────────
+  // ── Reusable Widgets ─────────────────────────────────────────────────
   Widget _buildAvatar(Doctor doctor, double size) {
     final initials = doctor.name.isNotEmpty
         ? doctor.name
@@ -560,7 +542,7 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
           height: size,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: ColorConstants.primaryContainer.withOpacity(0.15),
+            color: ColorConstants.onPrimary.withOpacity(0.15),
             border: Border.all(color: ColorConstants.borderWhite10, width: 1.5),
           ),
           child: doctor.profileImage != null && doctor.profileImage!.isNotEmpty
@@ -581,7 +563,9 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
             width: size * 0.25,
             height: size * 0.25,
             decoration: BoxDecoration(
-              color: doctor.isActive ? ColorConstants.success : Colors.grey,
+              color: doctor.isActive
+                  ? ColorConstants.success
+                  : ColorConstants.onSurfaceVariant,
               shape: BoxShape.circle,
               border: Border.all(color: ColorConstants.background, width: 2),
             ),
@@ -598,7 +582,7 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
         style: GoogleFonts.plusJakartaSans(
           fontSize: size * 0.35,
           fontWeight: FontWeight.w700,
-          color: ColorConstants.primary,
+          color: ColorConstants.onPrimary,
         ),
       ),
     );
@@ -606,25 +590,28 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
 
   Widget _buildInfoChip(IconData icon, String text) {
     if (text.isEmpty || text == 'Unknown') return const SizedBox.shrink();
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          icon,
-          size: 14,
-          color: ColorConstants.onSurfaceVariant.withOpacity(0.7),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 12,
-            fontWeight: FontWeight.w400,
-            color: ColorConstants.onSurfaceVariant,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: ColorConstants.secondaryContainer.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: ColorConstants.onPrimary),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: ColorConstants.onSurface,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -633,8 +620,8 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: doctor.isActive
-            ? ColorConstants.success.withOpacity(0.15)
-            : Colors.grey.withOpacity(0.15),
+            ? ColorConstants.onPrimary.withOpacity(0.15)
+            : ColorConstants.onPrimary,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
@@ -642,7 +629,9 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
         style: GoogleFonts.plusJakartaSans(
           fontSize: 11,
           fontWeight: FontWeight.w600,
-          color: doctor.isActive ? ColorConstants.success : Colors.grey,
+          color: doctor.isActive
+              ? ColorConstants.onPrimary
+              : ColorConstants.onPrimary,
         ),
       ),
     );
@@ -688,7 +677,7 @@ class _AssignDoctorScreenState extends State<AssignDoctorScreen>
     );
   }
 
-  // ── Assign Handler ──────────────────────────────────────────────────────
+  // ── Assign Handler ────────────────────────────────────────────────────
   void _handleAssignDoctor(Doctor doctor) {
     debugPrint(
       '[AssignDoctorScreen] Assign button tapped for ${doctor.name} (id=${doctor.id})',

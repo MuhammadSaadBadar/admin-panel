@@ -1,9 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/color_constants.dart';
 import '../../../core/widgets/custom_appbar.dart';
+import '../../../core/widgets/dashboard_background.dart';
 import '../../appointments/models/appointment.dart';
 import '../../patients/models/patient.dart';
 import '../controllers/doctor_detail_controller.dart';
@@ -65,65 +66,67 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
 
     return Scaffold(
       backgroundColor: ColorConstants.scaffoldBackground,
-      body: SafeArea(
-        child: Row(
-          children: [
-            if (!isMobile) _buildSidebar(),
-            Expanded(
-              child: Column(
-                children: [
-                  _buildTopAppBar(isMobile),
-                  Expanded(
-                    child: Obx(() {
-                      if (_controller.isLoading.value) {
-                        return const Center(
-                          child: CircularProgressIndicator(
-                            color: ColorConstants.primary,
-                          ),
-                        );
-                      }
-
-                      if (_controller.error.value != null) {
-                        return _buildErrorState();
-                      }
-
-                      final doctor = _controller.doctor.value;
-                      if (doctor == null) {
-                        return _buildNoDoctorState();
-                      }
-
-                      return LayoutBuilder(
-                        builder: (context, constraints) {
-                          return SingleChildScrollView(
-                            padding: EdgeInsets.all(isMobile ? 16 : 24),
-                            child: FadeTransition(
-                              opacity: _fadeAnimation,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildHeroProfile(isMobile, doctor),
-                                  SizedBox(height: isMobile ? 16 : 24),
-                                  _buildContactCard(isMobile, doctor),
-                                  SizedBox(height: isMobile ? 16 : 24),
-                                  _buildQualificationCard(isMobile, doctor),
-                                  SizedBox(height: isMobile ? 16 : 24),
-                                  _buildBioCard(isMobile, doctor),
-                                  SizedBox(height: isMobile ? 16 : 24),
-                                  _buildAssignedPatientsSection(isMobile),
-                                  SizedBox(height: isMobile ? 16 : 24),
-                                  _buildAppointmentsSection(isMobile),
-                                ],
-                              ),
+      body: DashboardBackground(
+        child: SafeArea(
+          child: Row(
+            children: [
+              if (!isMobile) _buildSidebar(),
+              Expanded(
+                child: Column(
+                  children: [
+                    _buildTopAppBar(isMobile),
+                    Expanded(
+                      child: Obx(() {
+                        if (_controller.isLoading.value) {
+                          return const Center(
+                            child: CircularProgressIndicator(
+                              color: ColorConstants.primary,
                             ),
                           );
-                        },
-                      );
-                    }),
-                  ),
-                ],
+                        }
+
+                        if (_controller.error.value != null) {
+                          return _buildErrorState();
+                        }
+
+                        final doctor = _controller.doctor.value;
+                        if (doctor == null) {
+                          return _buildNoDoctorState();
+                        }
+
+                        return LayoutBuilder(
+                          builder: (context, constraints) {
+                            return SingleChildScrollView(
+                              padding: EdgeInsets.all(isMobile ? 16 : 24),
+                              child: FadeTransition(
+                                opacity: _fadeAnimation,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildHeroProfile(isMobile, doctor),
+                                    SizedBox(height: isMobile ? 16 : 24),
+                                    _buildContactCard(isMobile, doctor),
+                                    SizedBox(height: isMobile ? 16 : 24),
+                                    _buildQualificationCard(isMobile, doctor),
+                                    SizedBox(height: isMobile ? 16 : 24),
+                                    _buildBioCard(isMobile, doctor),
+                                    SizedBox(height: isMobile ? 16 : 24),
+                                    _buildAssignedPatientsSection(isMobile),
+                                    SizedBox(height: isMobile ? 16 : 24),
+                                    _buildAppointmentsSection(isMobile),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      }),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -157,8 +160,12 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
     return Container(
       width: 280,
       decoration: BoxDecoration(
-        color: ColorConstants.surfaceContainerLow,
-        border: Border(right: BorderSide(color: ColorConstants.borderWhite10)),
+        color: ColorConstants.primaryContainer,
+        border: Border(
+          right: BorderSide(
+            color: ColorConstants.onPrimaryContainer.withOpacity(0.1),
+          ),
+        ),
       ),
       child: Column(
         children: [
@@ -183,7 +190,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                     letterSpacing: 0.05,
-                    color: ColorConstants.onSurfaceVariant,
+                    color: ColorConstants.onPrimaryContainer.withOpacity(0.7),
                   ),
                 ),
               ],
@@ -211,7 +218,9 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                         item['icon'] as IconData,
                         color: isSelected
                             ? ColorConstants.onSecondaryContainer
-                            : ColorConstants.onSurfaceVariant,
+                            : ColorConstants.onPrimaryContainer.withOpacity(
+                                0.7,
+                              ),
                         size: 24,
                       ),
                       title: Text(
@@ -223,7 +232,9 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                               : FontWeight.w400,
                           color: isSelected
                               ? ColorConstants.onSecondaryContainer
-                              : ColorConstants.onSurfaceVariant,
+                              : ColorConstants.onPrimaryContainer.withOpacity(
+                                  0.7,
+                                ),
                         ),
                       ),
                       onTap: () {},
@@ -238,9 +249,11 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: ColorConstants.surfaceContainer,
+                color: ColorConstants.onPrimary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: ColorConstants.borderWhite5),
+                border: Border.all(
+                  color: ColorConstants.onPrimaryContainer.withOpacity(0.1),
+                ),
               ),
               child: Row(
                 children: [
@@ -248,7 +261,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: ColorConstants.surfaceContainerHighest,
+                      color: ColorConstants.onPrimary.withOpacity(0.15),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -267,7 +280,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: ColorConstants.onSurface,
+                            color: ColorConstants.onPrimaryContainer,
                           ),
                         ),
                         Text(
@@ -275,7 +288,8 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 12,
                             fontWeight: FontWeight.w400,
-                            color: ColorConstants.onSurfaceVariant,
+                            color: ColorConstants.onPrimaryContainer
+                                .withOpacity(0.7),
                           ),
                         ),
                       ],
@@ -302,7 +316,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
           onPressed: () {},
           icon: Icon(
             Icons.notifications,
-            color: ColorConstants.onSurfaceVariant,
+            color: ColorConstants.onPrimaryContainer.withOpacity(0.7),
             size: isMobile ? 20 : 24,
           ),
         ),
@@ -325,7 +339,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: ColorConstants.onSurface,
+                color: ColorConstants.onPrimaryContainer,
               ),
             ),
             const SizedBox(height: 8),
@@ -333,7 +347,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
               _controller.error.value ?? 'An error occurred.',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 13,
-                color: ColorConstants.onSurfaceVariant,
+                color: ColorConstants.onPrimaryContainer.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -366,7 +380,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
             Icon(
               Icons.person_search,
               size: 56,
-              color: ColorConstants.onSurfaceVariant.withOpacity(0.4),
+              color: ColorConstants.onPrimaryContainer.withOpacity(0.4),
             ),
             const SizedBox(height: 16),
             Text(
@@ -374,7 +388,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: ColorConstants.onSurface,
+                color: ColorConstants.onPrimaryContainer,
               ),
             ),
             const SizedBox(height: 8),
@@ -382,7 +396,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
               'Please select a doctor from the list to view details.',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 14,
-                color: ColorConstants.onSurfaceVariant,
+                color: ColorConstants.onPrimaryContainer.withOpacity(0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -400,83 +414,105 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
         : 'N/A';
 
     if (isMobile) {
-      return Column(
-        children: [
-          Stack(
-            children: [
-              _buildAvatar(96, initials),
-              Positioned(
-                bottom: 4,
-                right: 4,
-                child: Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: doctor.isActive
-                        ? ColorConstants.success
-                        : ColorConstants.error,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: ColorConstants.background,
-                      width: 3,
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: ColorConstants.primary,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: ColorConstants.onPrimaryContainer.withOpacity(0.1),
+          ),
+        ),
+        child: Column(
+          children: [
+            Stack(
+              children: [
+                _buildAvatar(96, initials),
+                Positioned(
+                  bottom: 4,
+                  right: 4,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: doctor.isActive
+                          ? ColorConstants.success
+                          : ColorConstants.error,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: ColorConstants.onPrimary,
+                        width: 3,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            doctor.name,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: ColorConstants.onSurface,
+              ],
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            doctor.specialization.isNotEmpty
-                ? doctor.specialization
-                : 'General',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: ColorConstants.primary,
+            const SizedBox(height: 16),
+            Text(
+              doctor.name,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: ColorConstants.onPrimary,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _buildStatusBadge(
-                'ID: #${doctor.id}',
-                ColorConstants.onSurfaceVariant,
-                false,
+            const SizedBox(height: 4),
+            Text(
+              doctor.specialization.isNotEmpty
+                  ? doctor.specialization
+                  : 'General',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: ColorConstants.onPrimary,
               ),
-              _buildStatusBadge(
-                doctor.isActive ? 'ACTIVE' : 'INACTIVE',
-                doctor.isActive ? ColorConstants.success : ColorConstants.error,
-                true,
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildToggleActiveButton(doctor),
-        ],
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildStatusBadge(
+                  'ID: #${doctor.id}',
+                  ColorConstants.onPrimary.withOpacity(0.7),
+                  false,
+                ),
+                _buildStatusBadge(
+                  doctor.isActive ? 'ACTIVE' : 'INACTIVE',
+                  doctor.isActive
+                      ? ColorConstants.success
+                      : ColorConstants.error,
+                  true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildToggleActiveButton(doctor),
+          ],
+        ),
       );
     }
 
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: ColorConstants.cardBackground,
+        color: ColorConstants.primaryContainer,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ColorConstants.borderWhite10),
+        border: Border.all(
+          color: ColorConstants.onPrimaryContainer.withOpacity(0.1),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: ColorConstants.onPrimaryContainer.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -495,7 +531,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                         : ColorConstants.error,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: ColorConstants.background,
+                      color: ColorConstants.onPrimary,
                       width: 4,
                     ),
                   ),
@@ -513,7 +549,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
-                    color: ColorConstants.onSurface,
+                    color: ColorConstants.onPrimaryContainer,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -532,7 +568,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                   children: [
                     _buildStatusBadge(
                       'ID: #${doctor.id}',
-                      ColorConstants.onSurfaceVariant,
+                      ColorConstants.onPrimaryContainer.withOpacity(0.7),
                       false,
                     ),
                     const SizedBox(width: 12),
@@ -551,7 +587,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                     Icon(
                       Icons.event,
                       size: 16,
-                      color: ColorConstants.onSurfaceVariant,
+                      color: ColorConstants.onPrimaryContainer.withOpacity(0.7),
                     ),
                     const SizedBox(width: 6),
                     Text(
@@ -559,7 +595,9 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
-                        color: ColorConstants.onSurfaceVariant,
+                        color: ColorConstants.onPrimaryContainer.withOpacity(
+                          0.7,
+                        ),
                       ),
                     ),
                   ],
@@ -589,7 +627,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
           ],
         ),
         border: Border.all(
-          color: ColorConstants.surfaceContainerHigh,
+          color: ColorConstants.onPrimary.withOpacity(0.3),
           width: 3,
         ),
       ),
@@ -707,7 +745,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
               fontSize: isMobile ? 14 : 15,
               fontWeight: FontWeight.w400,
               height: 1.6,
-              color: ColorConstants.onSurfaceVariant,
+              color: ColorConstants.onPrimaryContainer.withOpacity(0.7),
             ),
           ),
         ),
@@ -724,7 +762,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
           height: 32,
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            color: ColorConstants.primary,
+            color: ColorConstants.onPrimary,
           ),
         );
       }
@@ -736,11 +774,11 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
         label: Text(active ? 'Deactivate Doctor' : 'Activate Doctor'),
         style: ElevatedButton.styleFrom(
           backgroundColor: active
-              ? ColorConstants.error
+              ? ColorConstants.onPrimary.withOpacity(0.1)
               : ColorConstants.success,
           foregroundColor: active
-              ? ColorConstants.onError
-              : ColorConstants.background,
+              ? ColorConstants.error
+              : ColorConstants.onPrimary,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
@@ -754,14 +792,14 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
 
     Get.dialog(
       AlertDialog(
-        backgroundColor: ColorConstants.cardBackground,
+        backgroundColor: ColorConstants.primaryContainer,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           '${newState ? 'Activate' : 'Deactivate'} Doctor',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 20,
             fontWeight: FontWeight.w700,
-            color: ColorConstants.onSurface,
+            color: ColorConstants.onPrimaryContainer,
           ),
         ),
         content: Text(
@@ -769,7 +807,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
           '${newState ? 'They will regain access to the platform.' : 'They will no longer be able to access the platform, but their history is preserved.'}',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 14,
-            color: ColorConstants.onSurfaceVariant,
+            color: ColorConstants.onPrimaryContainer.withOpacity(0.7),
           ),
         ),
         actions: [
@@ -780,7 +818,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: ColorConstants.onSurfaceVariant,
+                color: ColorConstants.onPrimaryContainer.withOpacity(0.7),
               ),
             ),
           ),
@@ -798,8 +836,8 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                   ? ColorConstants.success
                   : ColorConstants.error,
               foregroundColor: newState
-                  ? ColorConstants.background
-                  : ColorConstants.onError,
+                  ? ColorConstants.onPrimary
+                  : ColorConstants.onPrimary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -809,6 +847,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
+                color: ColorConstants.onPrimary,
               ),
             ),
           ),
@@ -861,7 +900,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                     _controller.patientsError.value!,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
-                      color: ColorConstants.onSurfaceVariant,
+                      color: ColorConstants.onPrimaryContainer.withOpacity(0.7),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -877,7 +916,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                 'No patients have been assigned to this doctor yet.',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
-                  color: ColorConstants.onSurfaceVariant,
+                  color: ColorConstants.onPrimaryContainer.withOpacity(0.7),
                 ),
               ),
             );
@@ -898,9 +937,11 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
       margin: const EdgeInsets.only(bottom: 8),
       padding: EdgeInsets.all(isMobile ? 12 : 14),
       decoration: BoxDecoration(
-        color: ColorConstants.surfaceContainerHigh.withOpacity(0.5),
+        color: ColorConstants.onPrimary.withOpacity(0.08),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: ColorConstants.borderWhite5),
+        border: Border.all(
+          color: ColorConstants.onPrimaryContainer.withOpacity(0.1),
+        ),
       ),
       child: Row(
         children: [
@@ -909,7 +950,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
             height: 36,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: ColorConstants.surfaceContainerHighest,
+              color: ColorConstants.onPrimary.withOpacity(0.15),
             ),
             child: Center(
               child: Text(
@@ -932,7 +973,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: isMobile ? 14 : 15,
                     fontWeight: FontWeight.w600,
-                    color: ColorConstants.onSurface,
+                    color: ColorConstants.onPrimaryContainer,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -940,7 +981,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                   patient.email.isNotEmpty ? patient.email : 'No email',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 12,
-                    color: ColorConstants.onSurfaceVariant,
+                    color: ColorConstants.onPrimaryContainer.withOpacity(0.7),
                   ),
                 ),
               ],
@@ -1001,7 +1042,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                     _controller.appointmentsError.value!,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
-                      color: ColorConstants.onSurfaceVariant,
+                      color: ColorConstants.onPrimaryContainer.withOpacity(0.7),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -1017,7 +1058,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                 'No appointments found for this doctor.',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
-                  color: ColorConstants.onSurfaceVariant,
+                  color: ColorConstants.onPrimaryContainer.withOpacity(0.7),
                 ),
               ),
             );
@@ -1041,9 +1082,11 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
       margin: const EdgeInsets.only(bottom: 8),
       padding: EdgeInsets.all(isMobile ? 12 : 14),
       decoration: BoxDecoration(
-        color: ColorConstants.surfaceContainerHigh.withOpacity(0.5),
+        color: ColorConstants.onPrimary.withOpacity(0.08),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: ColorConstants.borderWhite5),
+        border: Border.all(
+          color: ColorConstants.onPrimaryContainer.withOpacity(0.1),
+        ),
       ),
       child: Row(
         children: [
@@ -1052,7 +1095,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
             height: 36,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: ColorConstants.primaryContainer.withOpacity(0.2),
+              color: ColorConstants.primary.withOpacity(0.15),
             ),
             child: Icon(Icons.event, size: 18, color: ColorConstants.primary),
           ),
@@ -1066,7 +1109,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: isMobile ? 14 : 15,
                     fontWeight: FontWeight.w600,
-                    color: ColorConstants.onSurface,
+                    color: ColorConstants.onPrimaryContainer,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -1074,7 +1117,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                   '${appointment.appointmentType.displayLabel} • ${_formatDateTime(appointment.scheduledAt)}',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 12,
-                    color: ColorConstants.onSurfaceVariant,
+                    color: ColorConstants.onPrimaryContainer.withOpacity(0.7),
                   ),
                 ),
               ],
@@ -1098,9 +1141,9 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
       case AppointmentStatus.cancelled:
         return ColorConstants.error;
       case AppointmentStatus.noShow:
-        return ColorConstants.onSurfaceVariant;
+        return ColorConstants.onPrimaryContainer.withOpacity(0.7);
       case AppointmentStatus.unknown:
-        return ColorConstants.onSurfaceVariant;
+        return ColorConstants.onPrimaryContainer.withOpacity(0.7);
     }
   }
 
@@ -1139,9 +1182,11 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
       width: double.infinity,
       padding: EdgeInsets.all(isMobile ? 16 : 24),
       decoration: BoxDecoration(
-        color: ColorConstants.cardBackground,
+        color: ColorConstants.primaryContainer.withOpacity(0.95),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ColorConstants.borderWhite10),
+        border: Border.all(
+          color: ColorConstants.onPrimaryContainer.withOpacity(0.1),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1151,7 +1196,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: ColorConstants.primaryContainer.withOpacity(0.2),
+                  color: ColorConstants.primary.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -1166,9 +1211,11 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: isMobile ? 18 : 20,
                   fontWeight: FontWeight.w600,
-                  color: ColorConstants.onSurface,
+                  color: ColorConstants.onPrimaryContainer,
                 ),
               ),
+              const Spacer(),
+              if (trailing != null) trailing,
             ],
           ),
           SizedBox(height: isMobile ? 16 : 20),
@@ -1193,7 +1240,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: ColorConstants.surfaceContainerHigh,
+              color: ColorConstants.onPrimary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: ColorConstants.tertiary, size: 18),
@@ -1209,7 +1256,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                     fontSize: isMobile ? 10 : 11,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.05,
-                    color: ColorConstants.onSurfaceVariant,
+                    color: ColorConstants.onPrimaryContainer.withOpacity(0.6),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -1218,7 +1265,7 @@ class _DoctorDetailsScreenState extends State<DoctorDetailsScreen>
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: isMobile ? 14 : 15,
                     fontWeight: FontWeight.w600,
-                    color: ColorConstants.onSurface,
+                    color: ColorConstants.onPrimaryContainer,
                   ),
                 ),
               ],

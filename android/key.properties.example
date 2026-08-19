@@ -1,0 +1,20 @@
+# ----------------------------------------------------------------------------
+# Release signing configuration template.
+#
+# COPY THIS FILE to `key.properties` in the same `android/` directory and fill
+# in your real values. `key.properties` is git-ignored (see .gitignore) and
+# must NEVER be committed.
+#
+# Generate a keystore (if you don't have one yet) with:
+#   keytool -genkey -v \
+#     -keystore release.keystore.jks \
+#     -alias upload \
+#     -keyalg RSA -keysize 2048 -validity 10000
+#
+# The `storeFile` path is relative to the `android/` directory (where this
+# file lives when copied), or you can use an absolute path.
+# ----------------------------------------------------------------------------
+storePassword=YOUR_STORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=upload
+storeFile=release.keystore.jks

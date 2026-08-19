@@ -601,7 +601,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            '© 2024 Mama Health. Secure Administrative Environment.',
+            '© Mama Health. Secure Administrative Environment.',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 12,
               fontWeight: FontWeight.w500,

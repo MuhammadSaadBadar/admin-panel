@@ -15,26 +15,32 @@ class StatsGrid extends StatelessWidget {
     final bool isTablet = MediaQuery.of(context).size.width < 900;
 
     int crossAxisCount = 4;
-    double childAspectRatio = 1.2;
+    // Use a guaranteed minimum height (mainAxisExtent) rather than a
+    // childAspectRatio so the card content never overflows on narrow screens —
+    // the fixed ratio made cell height shrink with column width on small
+    // handsets, clipping the value text.
+    double mainAxisExtent = 110;
     double spacing = 16;
 
     if (isMobile) {
       crossAxisCount = 2;
-      childAspectRatio = 1.8;
+      mainAxisExtent = 132;
       spacing = 8;
     } else if (isTablet) {
       crossAxisCount = 2;
-      childAspectRatio = 1.4;
+      mainAxisExtent = 120;
       spacing = 16;
     }
 
-    return GridView.count(
+    return GridView(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: crossAxisCount,
-      crossAxisSpacing: spacing,
-      mainAxisSpacing: spacing,
-      childAspectRatio: childAspectRatio,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: spacing,
+        mainAxisSpacing: spacing,
+        mainAxisExtent: mainAxisExtent,
+      ),
       children: [
         StatCard(
           icon: Icons.person,
@@ -109,7 +115,11 @@ class StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: ColorConstants.cardBackground,
+        gradient: const LinearGradient(
+          colors: [ColorConstants.primary, ColorConstants.secondary],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: ColorConstants.borderWhite10),
       ),
@@ -123,10 +133,10 @@ class StatCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: iconBgColor,
+                  color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, color: iconColor, size: 20),
+                child: Icon(icon, color: Colors.white, size: 20),
               ),
               Flexible(
                 child: Text(
@@ -135,7 +145,7 @@ class StatCard extends StatelessWidget {
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.05,
-                    color: percentageColor,
+                    color: Colors.white.withOpacity(0.9),
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -151,7 +161,7 @@ class StatCard extends StatelessWidget {
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.05,
-                  color: ColorConstants.onSurfaceVariant,
+                  color: Colors.white.withOpacity(0.85),
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -161,7 +171,7 @@ class StatCard extends StatelessWidget {
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
-                  color: ColorConstants.onSurface,
+                  color: Colors.white,
                 ),
               ),
             ],

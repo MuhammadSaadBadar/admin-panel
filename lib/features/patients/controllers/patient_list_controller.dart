@@ -20,8 +20,6 @@ class PatientListController extends GetxController {
   // ── Filter State ──────────────────────────────────────────────────────
   final RxString searchQuery = ''.obs;
   final Rxn<int> selectedDoctorId = Rxn<int>();
-  final Rxn<int> selectedTrimester = Rxn<int>();
-  final RxString selectedRiskLevel = ''.obs;
 
   // Options for the Assigned Doctor dropdown (populated from the API).
   final RxList<Doctor> doctors = <Doctor>[].obs;
@@ -36,10 +34,7 @@ class PatientListController extends GetxController {
 
   /// Whether any filter is currently active.
   bool get hasActiveFilters =>
-      searchQuery.value.trim().isNotEmpty ||
-      selectedDoctorId.value != null ||
-      selectedTrimester.value != null ||
-      selectedRiskLevel.value.isNotEmpty;
+      searchQuery.value.trim().isNotEmpty || selectedDoctorId.value != null;
 
   /// Patients after applying client-side search/filtering.
   ///
@@ -112,25 +107,11 @@ class PatientListController extends GetxController {
     loadPatients();
   }
 
-  void setTrimester(int? trimester) {
-    debugPrint('[PatientListController] Trimester filter set: $trimester');
-    selectedTrimester.value = trimester;
-    loadPatients();
-  }
-
-  void setRiskLevel(String riskLevel) {
-    debugPrint('[PatientListController] Risk level filter set: "$riskLevel"');
-    selectedRiskLevel.value = riskLevel;
-    loadPatients();
-  }
-
   void clearFilters() {
     debugPrint('[PatientListController] Clearing all filters');
     _debounce?.cancel();
     searchQuery.value = '';
     selectedDoctorId.value = null;
-    selectedTrimester.value = null;
-    selectedRiskLevel.value = '';
     loadPatients();
   }
 
@@ -143,8 +124,7 @@ class PatientListController extends GetxController {
 
     debugPrint(
       '[PatientListController] Load patients — search="${searchQuery.value}" '
-      'doctorId=${selectedDoctorId.value} trimester=${selectedTrimester.value} '
-      'riskLevel="${selectedRiskLevel.value}"',
+      'doctorId=${selectedDoctorId.value}',
     );
 
     try {
@@ -153,8 +133,6 @@ class PatientListController extends GetxController {
         pageSize: _pageSize,
         search: searchQuery.value,
         doctorId: selectedDoctorId.value,
-        trimester: selectedTrimester.value,
-        riskLevel: selectedRiskLevel.value,
       );
       patients.assignAll(paginated.results);
       _hasMore = paginated.next != null;
@@ -183,8 +161,6 @@ class PatientListController extends GetxController {
         pageSize: _pageSize,
         search: searchQuery.value,
         doctorId: selectedDoctorId.value,
-        trimester: selectedTrimester.value,
-        riskLevel: selectedRiskLevel.value,
       );
       patients.addAll(paginated.results);
       _hasMore = paginated.next != null;

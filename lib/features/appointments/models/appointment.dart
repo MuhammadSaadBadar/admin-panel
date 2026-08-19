@@ -145,6 +145,132 @@ enum AppointmentType {
   }
 }
 
+/// Payment state machine for the manual (no-gateway) payment flow.
+///
+/// The backend calculates the final amount (doctor fee + admin commission) and
+/// drives status transitions. The frontend never trusts its own calculations —
+/// it reflects whatever the API returns.
+///
+///   pending            — no payment required (free) OR patient hasn't paid yet
+///   awaitingVerification — patient tapped "I have paid" (`patient_marked_paid_at`
+///                          set); doctor/admin must verify
+///   verified           — doctor/admin confirmed receipt (`confirmed_at` set);
+///                          appointment is confirmed in the same call
+///   rejected           — doctor/admin rejected the claim
+enum PaymentState {
+  pending,
+  awaitingVerification,
+  verified,
+  rejected,
+  none;
+
+  /// Parses a raw payment `status` string from the API. Falls back to [none]
+  /// when the payment object is absent (free consultation).
+  static PaymentState fromApi(String? raw) {
+    if (raw == null) return PaymentState.none;
+    switch (raw.toLowerCase()) {
+      case 'pending':
+        return PaymentState.pending;
+      case 'awaiting_verification':
+        return PaymentState.awaitingVerification;
+      case 'verified':
+      case 'paid':
+      case 'received':
+        return PaymentState.verified;
+      case 'rejected':
+      case 'failed':
+        return PaymentState.rejected;
+      default:
+        return PaymentState.none;
+    }
+  }
+
+  String get displayLabel {
+    switch (this) {
+      case PaymentState.pending:
+        return 'Pending';
+      case PaymentState.awaitingVerification:
+        return 'Awaiting Verification';
+      case PaymentState.verified:
+        return 'Verified / Paid';
+      case PaymentState.rejected:
+        return 'Rejected';
+      case PaymentState.none:
+        return 'No Payment';
+    }
+  }
+
+  /// Whether the patient can still tap "I have paid".
+  bool get patientCanMarkPaid =>
+      this == PaymentState.pending || this == PaymentState.rejected;
+
+  /// Whether a doctor/admin can verify this payment.
+  bool get canVerify => this == PaymentState.awaitingVerification;
+}
+
+/// The nested `payment` object returned on an appointment.
+///
+/// Mirrors the backend `AppointmentPayment` serializer:
+///   doctor_fee, commission_percentage, commission_amount, total_amount,
+///   status, patient_marked_paid_at, confirmed_at, payment_reference
+class AppointmentPaymentInfo {
+  final String doctorFee;
+  final String commissionPercentage;
+  final String commissionAmount;
+  final String totalAmount;
+  final PaymentState status;
+  final DateTime? patientMarkedPaidAt;
+  final DateTime? confirmedAt;
+  final String paymentReference;
+
+  const AppointmentPaymentInfo({
+    required this.doctorFee,
+    required this.commissionPercentage,
+    required this.commissionAmount,
+    required this.totalAmount,
+    required this.status,
+    required this.patientMarkedPaidAt,
+    required this.confirmedAt,
+    required this.paymentReference,
+  });
+
+  factory AppointmentPaymentInfo.fromJson(Map<String, dynamic> json) =>
+      AppointmentPaymentInfo(
+        doctorFee: (json['doctor_fee'] ?? '').toString(),
+        commissionPercentage: (json['commission_percentage'] ?? '').toString(),
+        commissionAmount: (json['commission_amount'] ?? '').toString(),
+        totalAmount: (json['total_amount'] ?? '').toString(),
+        status: PaymentState.fromApi(json['status']?.toString()),
+        patientMarkedPaidAt: json['patient_marked_paid_at'] != null
+            ? DateTime.tryParse(json['patient_marked_paid_at'].toString())
+            : null,
+        confirmedAt: json['confirmed_at'] != null
+            ? DateTime.tryParse(json['confirmed_at'].toString())
+            : null,
+        paymentReference: (json['payment_reference'] ?? '').toString(),
+      );
+
+  /// Total payable parsed as a double, or 0 if unparseable.
+  double get totalAmountValue => double.tryParse(totalAmount) ?? 0;
+
+  /// Whether a payment exists (i.e. the doctor has a consultation fee).
+  bool get exists => status != PaymentState.none;
+
+  /// Whether the appointment is effectively confirmed from a payment standpoint.
+  bool get isConfirmed => status == PaymentState.verified;
+
+  Map<String, dynamic> toJson() => {
+    'doctor_fee': doctorFee,
+    'commission_percentage': commissionPercentage,
+    'commission_amount': commissionAmount,
+    'total_amount': totalAmount,
+    'status': status.name,
+    'patient_marked_paid_at': patientMarkedPaidAt?.toIso8601String(),
+    'confirmed_at': confirmedAt?.toIso8601String(),
+    'payment_reference': paymentReference,
+  };
+}
+
 /// A single appointment as returned by the API.
 class Appointment {
   final int id;
@@ -158,6 +284,7 @@ class Appointment {
   final String reason;
   final String doctorNotes;
   final String cancellationReason;
+  final AppointmentPaymentInfo? payment;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -173,6 +300,7 @@ class Appointment {
     required this.reason,
     required this.doctorNotes,
     required this.cancellationReason,
+    required this.payment,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -195,6 +323,11 @@ class Appointment {
     reason: json['reason'] ?? '',
     doctorNotes: json['doctor_notes'] ?? '',
     cancellationReason: json['cancellation_reason'] ?? '',
+    payment: json['payment'] is Map
+        ? AppointmentPaymentInfo.fromJson(
+            (json['payment'] as Map).cast<String, dynamic>(),
+          )
+        : null,
     createdAt: json['created_at'] != null
         ? DateTime.tryParse(json['created_at'].toString())
         : null,
@@ -215,6 +348,7 @@ class Appointment {
     'reason': reason,
     'doctor_notes': doctorNotes,
     'cancellation_reason': cancellationReason,
+    'payment': payment?.toJson(),
     'created_at': createdAt?.toIso8601String(),
     'updated_at': updatedAt?.toIso8601String(),
   };
@@ -225,6 +359,19 @@ class Appointment {
     if (scheduled == null) return false;
     return scheduled.isAfter(DateTime.now());
   }
+
+  /// Convenience: whether a payment exists on this appointment.
+  bool get hasPayment => payment?.exists ?? false;
+
+  /// Convenience: whether the payment is awaiting doctor/admin verification.
+  bool get paymentAwaitingVerification =>
+      payment?.status == PaymentState.awaitingVerification;
+
+  /// Whether the patient can mark this appointment as paid.
+  bool get patientCanMarkPaid => payment?.status.patientCanMarkPaid ?? false;
+
+  /// Whether a doctor/admin can verify this appointment's payment.
+  bool get canVerifyPayment => payment?.status.canVerify ?? false;
 }
 
 /// Paginated appointments response wrapper, matching the API's

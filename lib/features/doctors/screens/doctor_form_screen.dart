@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -8,6 +8,7 @@ import '../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../core/widgets/custom_appbar.dart';
 import '../controllers/doctor_invite_controller.dart';
 import '../repositories/doctor_repository.dart';
+import '../../../core/widgets/dashboard_background.dart';
 
 /// Invite-a-doctor screen (replaces the old direct "create profile" form).
 ///
@@ -78,34 +79,36 @@ class _InviteDoctorScreenState extends State<InviteDoctorScreen>
 
     return Scaffold(
       backgroundColor: ColorConstants.scaffoldBackground,
-      body: Row(
-        children: [
-          // Desktop Sidebar
-          if (!isMobile) _buildSidebar(),
-          // Main Content
-          Expanded(
-            child: Column(
-              children: [
-                _buildTopAppBar(isMobile),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: Column(
-                        children: [
-                          _buildHeader(),
-                          const SizedBox(height: 24),
-                          _buildForm(),
-                        ],
+      body: DashboardBackground(
+        child: Row(
+          children: [
+            // Desktop Sidebar
+            if (!isMobile) _buildSidebar(),
+            // Main Content
+            Expanded(
+              child: Column(
+                children: [
+                  _buildTopAppBar(isMobile),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(24),
+                      child: FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: Column(
+                          children: [
+                            _buildHeader(),
+                            const SizedBox(height: 24),
+                            _buildForm(),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       bottomNavigationBar: isMobile
           ? AppBottomNavBar(

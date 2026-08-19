@@ -19,6 +19,18 @@ class DoctorListController extends GetxController {
   /// condition where a second toggle could fail and corrupt the list view).
   final RxBool isTogglingActive = false.obs;
 
+  // ── Search & Filter state ─────────────────────────────────────────────
+  /// The current search text (case-insensitive matching across name, email,
+  /// specialization, and ID). Reactive so the UI updates on every keystroke.
+  final RxString searchQuery = ''.obs;
+
+  /// The currently selected specialization filter. `''` means "All" / no filter.
+  final RxString selectedSpecialization = ''.obs;
+
+  /// The distinct, non-empty specializations present in the loaded doctors.
+  /// Derived after each list load so the filter chips stay in sync with data.
+  final RxList<String> availableSpecializations = <String>[].obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -34,8 +46,10 @@ class DoctorListController extends GetxController {
     try {
       final list = await _repository.getDoctors();
       doctors.assignAll(list);
+      _deriveSpecializations();
       debugPrint(
-        '[DoctorListController] loadDoctors — loaded ${list.length} doctors',
+        '[DoctorListController] loadDoctors — loaded ${list.length} doctors, '
+        'specializations=${availableSpecializations.length}',
       );
     } catch (e) {
       debugPrint('[DoctorListController] loadDoctors — ERROR: $e');
@@ -58,16 +72,103 @@ class DoctorListController extends GetxController {
     try {
       final list = await _repository.getDoctors();
       doctors.assignAll(list);
+      _deriveSpecializations();
       error.value = null;
       debugPrint(
         '[DoctorListController] refreshFromServer — loaded ${list.length} '
-        'doctors',
+        'doctors, specializations=${availableSpecializations.length}',
       );
     } catch (e) {
       // Keep the existing list on transient errors — do not overwrite updated
       // data with an error/empty state.
       debugPrint('[DoctorListController] refreshFromServer — ERROR: $e');
     }
+  }
+
+  // ── Search & Filter actions ───────────────────────────────────────────
+  /// Updates the reactive [searchQuery] as the user types (real-time).
+  /// Matching is case-insensitive and spans name, email, specialization, and ID.
+  void setSearchQuery(String value) {
+    final trimmed = value.trim();
+    debugPrint(
+      '[DoctorListController] setSearchQuery — "$searchQuery" → "$trimmed"',
+    );
+    searchQuery.value = trimmed;
+  }
+
+  /// Toggles the selected [specialization] filter. Tapping an already-selected
+  /// specialization deselects it (back to "All"). Tapping a new one replaces it.
+  void toggleSpecialization(String specialization) {
+    debugPrint(
+      '[DoctorListController] toggleSpecialization — '
+      'current="$selectedSpecialization" tapped="$specialization"',
+    );
+    if (selectedSpecialization.value == specialization) {
+      selectedSpecialization.value = '';
+      debugPrint(
+        '[DoctorListController] toggleSpecialization — deselected '
+        '(now All)',
+      );
+    } else {
+      selectedSpecialization.value = specialization;
+      debugPrint(
+        '[DoctorListController] toggleSpecialization — '
+        'selected="$specialization"',
+      );
+    }
+  }
+
+  /// Clears the search query and any selected specialization filter.
+  void clearFilters() {
+    debugPrint(
+      '[DoctorListController] clearFilters — was '
+      'search="$searchQuery" specialization="$selectedSpecialization"',
+    );
+    searchQuery.value = '';
+    selectedSpecialization.value = '';
+    debugPrint('[DoctorListController] clearFilters — filters cleared');
+  }
+
+  /// The list of doctors after applying the active search query and
+  /// specialization filter. This is the single source of truth for the
+  /// dashboard grid — the UI must not re-implement filtering logic.
+  List<Doctor> get filteredDoctors {
+    final query = searchQuery.value.toLowerCase();
+    final spec = selectedSpecialization.value;
+
+    List<Doctor> result = doctors;
+    if (query.isNotEmpty) {
+      result = result.where((d) {
+        return d.name.toLowerCase().contains(query) ||
+            d.email.toLowerCase().contains(query) ||
+            d.specialization.toLowerCase().contains(query) ||
+            d.id.toString().contains(query);
+      }).toList();
+    }
+    if (spec.isNotEmpty) {
+      result = result.where((d) => d.specialization == spec).toList();
+    }
+    return result;
+  }
+
+  /// Number of doctors that match the active search/filter criteria.
+  int get filteredCount => filteredDoctors.length;
+
+  /// Derives the distinct, non-empty specializations from the loaded doctors
+  /// so the filter chips stay in sync with the current dataset.
+  void _deriveSpecializations() {
+    final specs =
+        doctors
+            .map((d) => d.specialization)
+            .where((s) => s.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    availableSpecializations.assignAll(specs);
+    debugPrint(
+      '[DoctorListController] _deriveSpecializations — '
+      'specializations=$specs',
+    );
   }
 
   /// Propagates a successfully-updated [updated] doctor into the shared

@@ -25,9 +25,12 @@ class DashboardController extends GetxController {
 
   /// Fetches the admin dashboard stats from the API.
   ///
-  /// Guards against concurrent in-flight calls: if a request is already
-  /// running, subsequent calls are ignored until it completes.
-  Future<void> loadStats() async {
+  /// Optionally accepts a `dateFrom` / `dateTo` range that is forwarded to the
+  /// backend as `date_from` / `date_to` query params (used by the date-picker
+  /// filter on the dashboard). Guards against concurrent in-flight calls: if a
+  /// request is already running, subsequent calls are ignored until it
+  /// completes.
+  Future<void> loadStats({DateTime? dateFrom, DateTime? dateTo}) async {
     if (isLoading.value) {
       debugPrint(
         '[DashboardController] loadStats() called while already in flight — skipped.',
@@ -35,7 +38,10 @@ class DashboardController extends GetxController {
       return;
     }
 
-    debugPrint('[DashboardController] loadStats() started.');
+    debugPrint(
+      '[DashboardController] loadStats() started — '
+      'dateFrom=$dateFrom dateTo=$dateTo',
+    );
     isLoading.value = true;
     error.value = null;
     debugPrint(
@@ -43,7 +49,10 @@ class DashboardController extends GetxController {
     );
 
     try {
-      final data = await _repository.getStats();
+      final data = await _repository.getStats(
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+      );
       stats.value = data;
       debugPrint(
         '[DashboardController] Stats loaded successfully — '
@@ -52,6 +61,8 @@ class DashboardController extends GetxController {
         'todayAppointments=${data.todayAppointments} '
         'sos=${data.activeSosEvents} '
         'newPatientsThisWeek=${data.newPatientsThisWeek} '
+        'activeUsersLast30Days=${data.activeUsersLast30Days} '
+        'growth=${data.newPatientsGrowthPercent} '
         'activities=${data.recentActivities.length}',
       );
       debugPrint('[DashboardController] UI refresh triggered.');
@@ -64,9 +75,7 @@ class DashboardController extends GetxController {
         '[DashboardController] Stats load failed (DioException) — '
         'status=$statusCode message=${e.message} body=$body',
       );
-      debugPrint(
-        '[DashboardController] User-facing error message: "$message"',
-      );
+      debugPrint('[DashboardController] User-facing error message: "$message"');
     } catch (e, stackTrace) {
       const message = 'An unexpected error occurred. Please try again.';
       error.value = message;

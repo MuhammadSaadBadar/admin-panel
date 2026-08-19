@@ -5,8 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/color_constants.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/routes/route_names.dart';
-import '../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../core/widgets/custom_appbar.dart';
+import '../../../core/widgets/dashboard_background.dart';
 import '../controllers/patient_detail_controller.dart';
 import '../models/patient.dart';
 import '../models/patient_summary.dart';
@@ -69,55 +69,59 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
 
     return Scaffold(
       backgroundColor: ColorConstants.scaffoldBackground,
-      body: SafeArea(
-        child: Row(
-          children: [
-            if (!isMobile) _buildSidebar(),
-            Expanded(
-              child: Column(
-                children: [
-                  _buildTopAppBar(isMobile),
-                  Expanded(
-                    child: Obx(() {
-                      if (_controller.isLoadingPatient.value ||
-                          _controller.isLoadingSummary.value) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      final patient = _controller.patient.value;
-                      final summary = _controller.patientSummary.value;
-                      if (patient == null) {
-                        return const Center(
-                          child: Text("Failed to load patient data"),
-                        );
-                      }
-
-                      return LayoutBuilder(
-                        builder: (context, constraints) {
-                          return SingleChildScrollView(
-                            padding: EdgeInsets.all(isMobile ? 16 : 24),
-                            child: FadeTransition(
-                              opacity: _fadeAnimation,
-                              child: Column(
-                                children: [
-                                  _PatientProfileHeader(
-                                    isMobile: isMobile,
-                                    patient: patient,
-                                    summary: summary,
-                                  ),
-                                  SizedBox(height: isMobile ? 16 : 24),
-                                  _buildBentoGrid(isMobile, patient, summary),
-                                ],
-                              ),
-                            ),
+      body: DashboardBackground(
+        child: SafeArea(
+          child: Row(
+            children: [
+              if (!isMobile) _buildSidebar(),
+              Expanded(
+                child: Column(
+                  children: [
+                    _buildTopAppBar(isMobile),
+                    Expanded(
+                      child: Obx(() {
+                        if (_controller.isLoadingPatient.value ||
+                            _controller.isLoadingSummary.value) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
                           );
-                        },
-                      );
-                    }),
-                  ),
-                ],
+                        }
+                        final patient = _controller.patient.value;
+                        final summary = _controller.patientSummary.value;
+                        if (patient == null) {
+                          return const Center(
+                            child: Text("Failed to load patient data"),
+                          );
+                        }
+
+                        return LayoutBuilder(
+                          builder: (context, constraints) {
+                            return SingleChildScrollView(
+                              padding: EdgeInsets.all(isMobile ? 16 : 24),
+                              child: FadeTransition(
+                                opacity: _fadeAnimation,
+                                child: Column(
+                                  children: [
+                                    _PatientProfileHeader(
+                                      isMobile: isMobile,
+                                      patient: patient,
+                                      summary: summary,
+                                    ),
+                                    SizedBox(height: isMobile ? 16 : 24),
+                                    _buildBentoGrid(isMobile, patient, summary),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      }),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
@@ -130,26 +134,6 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
           controller: _controller,
         );
       }),
-      bottomNavigationBar: isMobile
-          ? AppBottomNavBar(
-              selectedIndex: 2,
-              onItemSelected: (index) {
-                switch (index) {
-                  case 0:
-                    Get.toNamed(RouteNames.dashboard);
-                    break;
-                  case 1:
-                    Get.toNamed(RouteNames.doctors);
-                    break;
-                  case 2:
-                    break;
-                  case 3:
-                    Get.toNamed(RouteNames.appointments);
-                    break;
-                }
-              },
-            )
-          : null,
     );
   }
 
@@ -339,11 +323,21 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
           const SizedBox(height: 16),
           _HealthTrackersCard(isMobile: isMobile, summary: summary),
           const SizedBox(height: 16),
-          _SymptomsAndDietCard(isMobile: isMobile, summary: summary),
+          _SymptomsAndDietCard(
+            isMobile: isMobile,
+            summary: summary,
+            onDietPlanTap: _openDietManagement,
+          ),
+          const SizedBox(height: 16),
+          _MedicationsCard(
+            isMobile: isMobile,
+            onRemindersTap: _openMedicationReminders,
+            onHistoryTap: _openMedicationHistory,
+          ),
           const SizedBox(height: 16),
           _AppointmentHistoryCard(isMobile: isMobile, summary: summary),
           const SizedBox(height: 16),
-          _MedicalReportsCard(isMobile: isMobile),
+          _MedicalReportsCard(isMobile: isMobile, summary: summary),
           const SizedBox(height: 16),
           _SosHistoryCard(isMobile: isMobile, controller: _controller),
           const SizedBox(height: 80), // Padding for fab
@@ -375,11 +369,21 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
               children: [
                 _HealthTrackersCard(isMobile: false, summary: summary),
                 const SizedBox(height: 24),
-                _SymptomsAndDietCard(isMobile: false, summary: summary),
+                _SymptomsAndDietCard(
+                  isMobile: false,
+                  summary: summary,
+                  onDietPlanTap: _openDietManagement,
+                ),
+                const SizedBox(height: 24),
+                _MedicationsCard(
+                  isMobile: false,
+                  onRemindersTap: _openMedicationReminders,
+                  onHistoryTap: _openMedicationHistory,
+                ),
                 const SizedBox(height: 24),
                 _AppointmentHistoryCard(isMobile: false, summary: summary),
                 const SizedBox(height: 24),
-                _MedicalReportsCard(isMobile: false),
+                _MedicalReportsCard(isMobile: false, summary: summary),
                 const SizedBox(height: 24),
                 _SosHistoryCard(isMobile: false, controller: _controller),
               ],
@@ -388,6 +392,59 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
         ],
       ),
     );
+  }
+
+  Future<void> _openDietManagement() async {
+    debugPrint(
+      '[PatientDetails] Opening Diet Management for patientId=$_patientId',
+    );
+    await Get.toNamed(
+      RouteNames.dietPlans,
+      arguments: {'patientId': _patientId},
+    );
+    // The Diet Plan Management / Create screens may have created or updated
+    // the patient's active diet plan. That flow lives deeper in the stack, so
+    // this screen's initState won't re-run on return. Refresh the summary now
+    // so the active diet plan reflects the latest backend state.
+    if (mounted) {
+      debugPrint(
+        '[PatientDetails] Returning from Diet Management — refreshing summary '
+        'for patientId=$_patientId',
+      );
+      _controller.loadPatientSummary(_patientId);
+    }
+  }
+
+  Future<void> _openMedicationReminders() async {
+    debugPrint(
+      '[PatientDetails] Opening Medication Reminders for patientId=$_patientId',
+    );
+    await Get.toNamed(
+      RouteNames.medicationReminders,
+      arguments: {'patientId': _patientId},
+    );
+    // The reminder screens may have created/updated/deleted reminders or
+    // status flags. Refresh the summary so medication adherence stays in sync.
+    if (mounted) {
+      debugPrint(
+        '[PatientDetails] Returning from Medication Reminders — refreshing '
+        'summary for patientId=$_patientId',
+      );
+      _controller.loadPatientSummary(_patientId);
+    }
+  }
+
+  Future<void> _openMedicationHistory() async {
+    debugPrint(
+      '[PatientDetails] Opening Medication History for patientId=$_patientId',
+    );
+    await Get.toNamed(
+      RouteNames.medicationHistory,
+      arguments: {'patientId': _patientId},
+    );
+    if (mounted) {
+      _controller.loadPatientSummary(_patientId);
+    }
   }
 }
 
@@ -702,7 +759,7 @@ class _PersonalInfoCard extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(isMobile ? 12 : 16),
       decoration: BoxDecoration(
-        color: ColorConstants.cardBackground,
+        color: ColorConstants.primary,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: ColorConstants.borderWhite10),
       ),
@@ -717,12 +774,12 @@ class _PersonalInfoCard extends StatelessWidget {
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: isMobile ? 18 : 20,
                   fontWeight: FontWeight.w600,
-                  color: ColorConstants.onSurface,
+                  color: ColorConstants.onPrimary,
                 ),
               ),
               Icon(
                 Icons.person,
-                color: ColorConstants.primary,
+                color: ColorConstants.onPrimary,
                 size: isMobile ? 20 : 24,
               ),
             ],
@@ -740,7 +797,7 @@ class _PersonalInfoCard extends StatelessWidget {
             style: GoogleFonts.plusJakartaSans(
               fontSize: isMobile ? 12 : 14,
               fontWeight: FontWeight.w400,
-              color: ColorConstants.onSurfaceVariant,
+              color: ColorConstants.onPrimary,
             ),
           ),
           SizedBox(height: isMobile ? 8 : 12),
@@ -750,7 +807,7 @@ class _PersonalInfoCard extends StatelessWidget {
             style: GoogleFonts.plusJakartaSans(
               fontSize: isMobile ? 12 : 14,
               fontWeight: FontWeight.w400,
-              color: ColorConstants.onSurfaceVariant,
+              color: ColorConstants.onPrimaryContainer,
             ),
           ),
           SizedBox(height: isMobile ? 8 : 12),
@@ -770,7 +827,7 @@ class _PersonalInfoCard extends StatelessWidget {
             fontSize: isMobile ? 10 : 12,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.05,
-            color: ColorConstants.onSurfaceVariant,
+            color: ColorConstants.onPrimary,
           ),
         ),
         const SizedBox(height: 4),
@@ -779,7 +836,7 @@ class _PersonalInfoCard extends StatelessWidget {
           style: GoogleFonts.plusJakartaSans(
             fontSize: isMobile ? 14 : 16,
             fontWeight: FontWeight.w600,
-            color: ColorConstants.onSurface,
+            color: ColorConstants.onPrimary,
           ),
         ),
       ],
@@ -1138,8 +1195,13 @@ class _HealthTrackersCard extends StatelessWidget {
 class _SymptomsAndDietCard extends StatelessWidget {
   final bool isMobile;
   final PatientSummary? summary;
+  final VoidCallback onDietPlanTap;
 
-  const _SymptomsAndDietCard({required this.isMobile, required this.summary});
+  const _SymptomsAndDietCard({
+    required this.isMobile,
+    required this.summary,
+    required this.onDietPlanTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1153,6 +1215,71 @@ class _SymptomsAndDietCard extends StatelessWidget {
       }
     }
     final dietPlan = summary?.activeDietPlan;
+
+    final dietWidget = Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: ColorConstants.primary,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ColorConstants.borderWhite10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Diet Plan',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: ColorConstants.onPrimary,
+                ),
+              ),
+              Icon(
+                Icons.restaurant_menu,
+                color: ColorConstants.onPrimary,
+                size: 20,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            dietPlan?.notes ?? 'No active diet plan.',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+              fontStyle: FontStyle.italic,
+              color: ColorConstants.onPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onDietPlanTap,
+              icon: const Icon(Icons.restaurant_menu, size: 18),
+              label: Text(
+                'Manage Diet Plans',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: ColorConstants.onPrimary,
+                side: BorderSide(color: ColorConstants.onPrimary),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
 
     final symptomsWidget = Container(
       padding: const EdgeInsets.all(12),
@@ -1189,38 +1316,6 @@ class _SymptomsAndDietCard extends StatelessWidget {
                   .map((s) => _buildSymptomChip(s, ColorConstants.error))
                   .toList(),
             ),
-        ],
-      ),
-    );
-
-    final dietWidget = Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: ColorConstants.cardBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ColorConstants.borderWhite10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Diet Plan',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: ColorConstants.onSurface,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            dietPlan?.notes ?? 'No active diet plan.',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-              fontStyle: FontStyle.italic,
-              color: ColorConstants.onSurfaceVariant,
-            ),
-          ),
         ],
       ),
     );
@@ -1321,7 +1416,7 @@ class _AppointmentHistoryCard extends StatelessWidget {
               child: DataTable(
                 columnSpacing: isMobile ? 16 : 32,
                 headingRowColor: WidgetStateProperty.all(
-                  Colors.white.withOpacity(0.05),
+                  ColorConstants.surfaceContainerHighest,
                 ),
                 headingTextStyle: GoogleFonts.plusJakartaSans(
                   fontSize: isMobile ? 10 : 12,
@@ -1376,11 +1471,20 @@ class _AppointmentHistoryCard extends StatelessWidget {
 
 class _MedicalReportsCard extends StatelessWidget {
   final bool isMobile;
+  final PatientSummary? summary;
 
-  const _MedicalReportsCard({required this.isMobile});
+  const _MedicalReportsCard({required this.isMobile, this.summary});
 
   @override
   Widget build(BuildContext context) {
+    // Show live adherence data from the patient summary instead of a static
+    // placeholder. If no summary/adherence data is present, show an
+    // informative empty state.
+    final adherence = summary?.medicineAdherence;
+    final hasAdherence =
+        adherence != null &&
+        (adherence.taken > 0 || adherence.skipped > 0 || adherence.pending > 0);
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(isMobile ? 12 : 16),
@@ -1392,21 +1496,265 @@ class _MedicalReportsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Medical Reports',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: isMobile ? 18 : 20,
-              fontWeight: FontWeight.w600,
-              color: ColorConstants.onSurface,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Medical Reports',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: isMobile ? 18 : 20,
+                  fontWeight: FontWeight.w600,
+                  color: ColorConstants.onSurface,
+                ),
+              ),
+              Icon(
+                Icons.assessment,
+                color: ColorConstants.primary,
+                size: isMobile ? 20 : 24,
+              ),
+            ],
           ),
           SizedBox(height: isMobile ? 8 : 12),
-          Text(
-            'No medical reports available.',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              color: ColorConstants.onSurfaceVariant,
+          if (!hasAdherence)
+            Text(
+              'No medical reports available.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                color: ColorConstants.onSurfaceVariant,
+              ),
+            )
+          else ...[
+            // Medicine adherence summary pulled from the live summary API.
+            _buildAdherenceRow(
+              'Medication Adherence',
+              adherence.taken,
+              adherence.skipped,
+              adherence.pending,
+              isMobile,
             ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdherenceRow(
+    String label,
+    int taken,
+    int skipped,
+    int pending,
+    bool isMobile,
+  ) {
+    final total = taken + skipped + pending;
+    final rate = total > 0 ? (taken / total * 100).round() : 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: isMobile ? 12 : 14,
+                fontWeight: FontWeight.w600,
+                color: ColorConstants.onSurface,
+              ),
+            ),
+            Text(
+              '$rate%',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: isMobile ? 14 : 16,
+                fontWeight: FontWeight.w700,
+                color: ColorConstants.primary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: LinearProgressIndicator(
+            value: total > 0 ? rate / 100 : 0,
+            backgroundColor: ColorConstants.surfaceContainerHighest,
+            color: ColorConstants.primary,
+            minHeight: isMobile ? 6 : 8,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '$taken taken • $skipped skipped • $pending pending',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: isMobile ? 11 : 12,
+            color: ColorConstants.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MedicationsCard extends StatelessWidget {
+  final bool isMobile;
+  final VoidCallback onRemindersTap;
+  final VoidCallback onHistoryTap;
+
+  const _MedicationsCard({
+    required this.isMobile,
+    required this.onRemindersTap,
+    required this.onHistoryTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Widget buildTile({
+      required IconData icon,
+      required String title,
+      required String subtitle,
+      required VoidCallback onTap,
+      required Color accent,
+    }) {
+      return Container(
+        padding: EdgeInsets.all(isMobile ? 12 : 14),
+        decoration: BoxDecoration(
+          color: ColorConstants.primary,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: ColorConstants.onPrimary),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Row(
+            children: [
+              Container(
+                width: isMobile ? 40 : 48,
+                height: isMobile ? 40 : 48,
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: accent, size: isMobile ? 20 : 24),
+              ),
+              SizedBox(width: isMobile ? 12 : 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: isMobile ? 15 : 16,
+                        fontWeight: FontWeight.w700,
+                        color: ColorConstants.onPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: isMobile ? 11 : 12,
+                        color: ColorConstants.onPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: ColorConstants.onPrimary,
+                size: isMobile ? 20 : 24,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Medications',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: ColorConstants.primary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          buildTile(
+            icon: Icons.medication,
+            title: 'Medication Reminders',
+            subtitle: 'View and manage this patient\'s reminders',
+            onTap: onRemindersTap,
+            accent: ColorConstants.onPrimary,
+          ),
+          const SizedBox(height: 12),
+          buildTile(
+            icon: Icons.assignment_turned_in,
+            title: 'Medication History',
+            subtitle: 'View this patient\'s intake records',
+            onTap: onHistoryTap,
+            accent: ColorConstants.onPrimary,
+          ),
+        ],
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(isMobile ? 12 : 16),
+      decoration: BoxDecoration(
+        color: ColorConstants.cardBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ColorConstants.borderWhite10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Medications',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: isMobile ? 18 : 20,
+                  fontWeight: FontWeight.w600,
+                  color: ColorConstants.onSurface,
+                ),
+              ),
+              Icon(
+                Icons.medication,
+                color: ColorConstants.primary,
+                size: isMobile ? 20 : 24,
+              ),
+            ],
+          ),
+          SizedBox(height: isMobile ? 8 : 12),
+          Row(
+            children: [
+              Expanded(
+                child: buildTile(
+                  icon: Icons.medication,
+                  title: 'Medication Reminders',
+                  subtitle: 'Manage this patient\'s reminders',
+                  onTap: onRemindersTap,
+                  accent: ColorConstants.tertiary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: buildTile(
+                  icon: Icons.assignment_turned_in,
+                  title: 'Medication History',
+                  subtitle: 'View intake records',
+                  onTap: onHistoryTap,
+                  accent: ColorConstants.primary,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1761,13 +2109,15 @@ class _ActionBar extends StatelessWidget {
         _buildMobileButton(
           label: 'Assign Doctor',
           icon: Icons.person_add_alt_1,
-          color: ColorConstants.secondary,
+          color: ColorConstants.onPrimaryContainer,
           onPressed: () => _navigateToAssignDoctor(),
         ),
         _buildMobileButton(
           label: isActive ? 'Deactivate' : 'Activate',
           icon: isActive ? Icons.block : Icons.check_circle_outline,
-          color: isActive ? Colors.orange.shade400 : Colors.green.shade400,
+          color: isActive
+              ? ColorConstants.onPrimaryContainer
+              : ColorConstants.success,
           onPressed: () => _confirmStatusToggle(context, isActive),
         ),
         // _buildMobileButton(
@@ -1881,20 +2231,52 @@ class _ActionBar extends StatelessWidget {
             ),
             style: OutlinedButton.styleFrom(
               foregroundColor: isActive
-                  ? Colors.orange.shade400
-                  : Colors.green.shade400,
+                  ? ColorConstants.warning
+                  : ColorConstants.success,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
               side: BorderSide(
                 color:
-                    (isActive ? Colors.orange.shade400 : Colors.green.shade400)
+                    (isActive ? ColorConstants.warning : ColorConstants.success)
                         .withOpacity(0.3),
               ),
               backgroundColor:
-                  (isActive ? Colors.orange.shade400 : Colors.green.shade400)
+                  (isActive ? ColorConstants.warning : ColorConstants.success)
                       .withOpacity(0.15),
+            ),
+          );
+        }),
+        const SizedBox(width: 12),
+        // Mark Paid (admin manual payment confirmation)
+        Obx(() {
+          final marking = controller.isMarkingPaid.value;
+          return OutlinedButton.icon(
+            onPressed: marking ? null : () => _showMarkPaidDialog(context),
+            icon: marking
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.payments_outlined, size: 18),
+            label: Text(
+              'Mark Paid',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.05,
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: ColorConstants.tertiary,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              side: BorderSide(color: ColorConstants.tertiary.withOpacity(0.4)),
+              backgroundColor: ColorConstants.tertiary.withOpacity(0.1),
             ),
           );
         }),
@@ -1930,6 +2312,126 @@ class _ActionBar extends StatelessWidget {
       '[ActionBar] Navigating to Assign Doctor for patientId=${patient.id}',
     );
     Get.toNamed(RouteNames.assignDoctor, arguments: {'patientId': patient.id});
+  }
+
+  // ── Mark Paid ─────────────────────────────────────────────────────────
+  void _showMarkPaidDialog(BuildContext context) {
+    final referenceController = TextEditingController();
+    final amountController = TextEditingController();
+    debugPrint(
+      '[ActionBar] Opening mark-paid dialog for patientId=${patient.id}',
+    );
+
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: ColorConstants.cardBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Mark Patient as Paid',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: ColorConstants.onSurface,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Record a manual payment received for ${patient.name}. '
+              'This confirms the patient has full access.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                color: ColorConstants.onSurfaceVariant,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: referenceController,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                color: ColorConstants.onSurface,
+              ),
+              decoration: InputDecoration(
+                labelText: 'Payment Reference (optional)',
+                labelStyle: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  color: ColorConstants.onSurfaceVariant,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: ColorConstants.borderWhite10),
+                ),
+                filled: true,
+                fillColor: ColorConstants.surfaceContainer,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: amountController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                color: ColorConstants.onSurface,
+              ),
+              decoration: InputDecoration(
+                labelText: 'Amount Paid (optional)',
+                labelStyle: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  color: ColorConstants.onSurfaceVariant,
+                ),
+                prefixText: 'Rs. ',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: ColorConstants.borderWhite10),
+                ),
+                filled: true,
+                fillColor: ColorConstants.surfaceContainer,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: ColorConstants.onSurfaceVariant,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              controller.markPatientPaid(
+                paymentReference: referenceController.text.trim(),
+                amountPaid: amountController.text.trim(),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ColorConstants.tertiary,
+              foregroundColor: ColorConstants.onPrimary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Confirm Payment',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ── Status Toggle ──────────────────────────────────────────────────────
@@ -1993,9 +2495,9 @@ class _ActionBar extends StatelessWidget {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: newStatus
-                  ? Colors.green.shade400
-                  : Colors.orange.shade400,
-              foregroundColor: Colors.white,
+                  ? ColorConstants.success
+                  : ColorConstants.warning,
+              foregroundColor: ColorConstants.onPrimary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),

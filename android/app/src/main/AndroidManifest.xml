@@ -1,7 +1,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Internet access is required for all API calls to the Mama Health
+         backend (https://mama-health-backend.onrender.com). Without this, the
+         app cannot authenticate or load any data on a physical device. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Android 13+ (API 33) requires this runtime permission to display
+         notifications. The app currently reads the admin notification inbox
+         over the API; this permission is declared for future local/FCM
+         notifications and is requested at runtime on Android 13+. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
     <application
-        android:label="admin"
+        android:label="Mama Health Admin"
         android:name="${applicationName}"
+        android:usesCleartextTraffic="false"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"

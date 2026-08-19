@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -6,6 +6,8 @@ import '../../../core/constants/color_constants.dart';
 import '../../../core/routes/route_names.dart';
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/widgets/custom_appbar.dart';
+import '../../../core/widgets/dashboard_background.dart';
+import '../../notifications/widgets/notification_bell.dart';
 import '../controllers/doctor_list_controller.dart';
 import '../models/doctor.dart';
 
@@ -27,8 +29,14 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
-  String _searchQuery = '';
-  String _selectedFilter = 'All';
+  /// A single, persistent [TextEditingController] for the search field.
+  ///
+  /// IMPORTANT: This must be created ONCE and reused across rebuilds. Creating
+  /// a new `TextEditingController` inside the `Obx`/build method — even with
+  /// `text: controller.searchQuery.value` — resets the field on every keystroke,
+  /// causing cursor jumps and reordered/duplicated characters. Keeping it as a
+  /// State field preserves the exact text as typed.
+  late final TextEditingController _searchController;
 
   @override
   void initState() {
@@ -42,43 +50,19 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
       curve: Curves.easeOut,
     );
     _animationController.forward();
+
+    // Seed the text controller with the current search query (typically empty).
+    final controller = Get.find<DoctorListController>();
+    _searchController = TextEditingController(
+      text: controller.searchQuery.value,
+    );
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _searchController.dispose();
     super.dispose();
-  }
-
-  List<Doctor> _filteredDoctors(List<Doctor> doctors) {
-    var filtered = doctors;
-
-    // Apply search filter
-    if (_searchQuery.isNotEmpty) {
-      filtered = filtered
-          .where(
-            (doctor) =>
-                doctor.name.toLowerCase().contains(
-                  _searchQuery.toLowerCase(),
-                ) ||
-                doctor.specialization.toLowerCase().contains(
-                  _searchQuery.toLowerCase(),
-                ) ||
-                doctor.id.toString().toLowerCase().contains(
-                  _searchQuery.toLowerCase(),
-                ),
-          )
-          .toList();
-    }
-
-    // Apply specialty filter
-    if (_selectedFilter != 'All') {
-      filtered = filtered
-          .where((doctor) => doctor.specialization == _selectedFilter)
-          .toList();
-    }
-
-    return filtered;
   }
 
   @override
@@ -97,35 +81,37 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
               },
             )
           : null,
-      body: Row(
-        children: [
-          // Desktop Sidebar
-          if (!isMobile) _buildSidebar(colorScheme),
-          // Main Content
-          Expanded(
-            child: Column(
-              children: [
-                _buildTopAppBar(colorScheme, isMobile),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildSearchAndFilters(colorScheme),
-                          const SizedBox(height: 24),
-                          _buildDoctorContent(colorScheme),
-                        ],
+      body: DashboardBackground(
+        child: Row(
+          children: [
+            // Desktop Sidebar
+            if (!isMobile) _buildSidebar(colorScheme),
+            // Main Content
+            Expanded(
+              child: Column(
+                children: [
+                  _buildTopAppBar(colorScheme, isMobile),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(24),
+                      child: FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSearchAndFilters(colorScheme),
+                            const SizedBox(height: 24),
+                            _buildDoctorContent(colorScheme),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       // floatingActionButton: _buildAddDoctorButton(colorScheme),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
@@ -151,13 +137,25 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
         return _buildErrorState(colorScheme, controller);
       }
 
-      final filtered = _filteredDoctors(controller.doctors.toList());
+      final filtered = controller.filteredDoctors;
 
       if (filtered.isEmpty) {
-        return _buildEmptyState(colorScheme);
+        // Differentiate "no doctors at all" from "no results match the active
+        // search/filter".
+        if (controller.doctors.isEmpty) {
+          return _buildEmptyState(colorScheme, hasActiveFilters: false);
+        }
+        return _buildEmptyState(colorScheme, hasActiveFilters: true);
       }
 
-      return _buildDoctorGrid(colorScheme, filtered);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildResultCount(colorScheme, controller),
+          const SizedBox(height: 16),
+          _buildDoctorGrid(colorScheme, filtered),
+        ],
+      );
     });
   }
 
@@ -206,7 +204,10 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
     );
   }
 
-  Widget _buildEmptyState(ColorScheme colorScheme) {
+  Widget _buildEmptyState(
+    ColorScheme colorScheme, {
+    required bool hasActiveFilters,
+  }) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 48),
@@ -214,13 +215,13 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.person_search,
+              hasActiveFilters ? Icons.search_off : Icons.person_search,
               size: 56,
               color: colorScheme.onSurfaceVariant.withOpacity(0.4),
             ),
             const SizedBox(height: 16),
             Text(
-              'No doctors found',
+              hasActiveFilters ? 'No matching doctors' : 'No doctors found',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -229,7 +230,9 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              'Try adjusting your search or filters.',
+              hasActiveFilters
+                  ? 'No doctors match your current search or filters.'
+                  : 'Try adjusting your search or filters.',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 13,
                 color: colorScheme.onSurfaceVariant,
@@ -239,6 +242,35 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
         ),
       ),
     );
+  }
+
+  /// Shows a summary line: "Showing X of Y doctors", reflecting the filtered
+  /// results rather than the total dataset.
+  Widget _buildResultCount(
+    ColorScheme colorScheme,
+    DoctorListController controller,
+  ) {
+    return Text(
+      'Showing ${controller.filteredCount} of ${controller.doctors.length} '
+      'doctors${_activeFilterSummary(controller)}',
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: colorScheme.onSurfaceVariant,
+      ),
+    );
+  }
+
+  /// Builds a short summary of the active search/filter for the count line.
+  String _activeFilterSummary(DoctorListController controller) {
+    final parts = <String>[];
+    if (controller.searchQuery.value.isNotEmpty) {
+      parts.add('matching "${controller.searchQuery.value}"');
+    }
+    if (controller.selectedSpecialization.value.isNotEmpty) {
+      parts.add('in ${controller.selectedSpecialization.value}');
+    }
+    return parts.isEmpty ? '' : ' (${parts.join(', ')})';
   }
 
   Widget _buildSidebar(ColorScheme colorScheme) {
@@ -269,7 +301,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
       width: 280,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        border: Border(right: BorderSide(color: Colors.white.withOpacity(0.1))),
+        border: Border(right: BorderSide(color: ColorConstants.borderWhite10)),
       ),
       child: Column(
         children: [
@@ -382,16 +414,9 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
   Widget _buildTopAppBar(ColorScheme colorScheme, bool isMobile) {
     return CustomAppBar(
       title: 'Doctor Management',
-      showMenuButton: isMobile,
-      onMenuTap: () {
-        debugPrint('[DoctorDashboard] Menu tapped — opening drawer');
-        _scaffoldKey.currentState?.openDrawer();
-      },
+      showBackButton: isMobile,
       actions: [
-        IconButton(
-          onPressed: () {},
-          icon: Icon(Icons.notifications, color: colorScheme.primary),
-        ),
+        const NotificationBell(),
         const SizedBox(width: 8),
         Container(
           width: 32,
@@ -408,117 +433,187 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
   }
 
   Widget _buildSearchAndFilters(ColorScheme colorScheme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Search Bar
-        Container(
-          constraints: const BoxConstraints(maxWidth: 600),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.1)),
-          ),
-          child: Row(
-            children: [
-              const SizedBox(width: 16),
-              Icon(Icons.search, color: colorScheme.onSurfaceVariant, size: 24),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value;
-                    });
-                  },
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14,
-                    color: colorScheme.onSurface,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Search by name, ID or specialty...',
-                    hintStyle: GoogleFonts.plusJakartaSans(
+    final controller = Get.find<DoctorListController>();
+
+    return Obx(() {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Search Bar
+          Container(
+            constraints: const BoxConstraints(maxWidth: 600),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: ColorConstants.borderWhite10),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(width: 16),
+                Icon(
+                  Icons.search,
+                  color: colorScheme.onSurfaceVariant,
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    onChanged: controller.setSearchQuery,
+                    controller: _searchController,
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 14,
-                      color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                      color: colorScheme.onSurface,
                     ),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: InputDecoration(
+                      hintText: 'Search by name, ID or specialty...',
+                      hintStyle: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
                   ),
+                ),
+                if (controller.searchQuery.value.isNotEmpty)
+                  IconButton(
+                    onPressed: () {
+                      // Clear both the reactive query AND the text field so the
+                      // UI and state stay synchronized.
+                      _searchController.clear();
+                      controller.setSearchQuery('');
+                    },
+                    icon: Icon(
+                      Icons.clear,
+                      color: colorScheme.onSurfaceVariant,
+                      size: 20,
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    tooltip: 'Clear search',
+                  ),
+                const SizedBox(width: 8),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Filter Chips - FIXED ALIGNMENT
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.start,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: Text(
+                  'Filters:',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.05,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              _buildFilterChip(
+                'All',
+                controller.selectedSpecialization.value.isEmpty,
+                colorScheme,
+                onTap: () => controller.toggleSpecialization(''),
+              ),
+              ...controller.availableSpecializations.map(
+                (spec) => _buildFilterChip(
+                  spec,
+                  controller.selectedSpecialization.value == spec,
+                  colorScheme,
+                  onTap: () => controller.toggleSpecialization(spec),
+                ),
+              ),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.transparent,
+                ),
+                child: IconButton(
+                  onPressed: () => _showFilterMenu(controller, colorScheme),
+                  icon: Icon(
+                    Icons.filter_list,
+                    color: colorScheme.onSurfaceVariant,
+                    size: 24,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 32,
+                    height: 32,
+                  ),
+                  tooltip: 'All specializations',
                 ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 16),
-        // Filter Chips - FIXED ALIGNMENT
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          alignment: WrapAlignment.start,
-          crossAxisAlignment: WrapCrossAlignment.center,
+        ],
+      );
+    });
+  }
+
+  /// Shows a dropdown menu of all available specializations (plus "All") so
+  /// the user can select/deselect a filter even when the chips overflow.
+  void _showFilterMenu(
+    DoctorListController controller,
+    ColorScheme colorScheme,
+  ) {
+    Get.bottomSheet(
+      Container(
+        color: ColorConstants.cardBackground,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: Text(
-                'Filters:',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.05,
-                  color: colorScheme.onSurfaceVariant,
-                ),
+            Text(
+              'Filter by specialization',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: colorScheme.onSurface,
               ),
             ),
-            _buildFilterChip('All', _selectedFilter == 'All', colorScheme),
-            _buildFilterChip(
-              'Gynaecologist',
-              _selectedFilter == 'Gynaecologist',
-              colorScheme,
-            ),
-            _buildFilterChip(
-              'Pediatrician',
-              _selectedFilter == 'Pediatrician',
-              colorScheme,
-            ),
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.transparent,
-              ),
-              child: IconButton(
-                onPressed: () {},
-                icon: Icon(
-                  Icons.filter_list,
-                  color: colorScheme.onSurfaceVariant,
-                  size: 24,
+            const SizedBox(height: 12),
+            ...controller.availableSpecializations.map(
+              (spec) => ListTile(
+                title: Text(
+                  spec,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    color: colorScheme.onSurface,
+                  ),
                 ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 32,
-                  height: 32,
-                ),
+                trailing: controller.selectedSpecialization.value == spec
+                    ? Icon(Icons.check, color: colorScheme.primary)
+                    : null,
+                onTap: () {
+                  Get.back();
+                  controller.toggleSpecialization(spec);
+                },
               ),
             ),
           ],
         ),
-      ],
+      ),
     );
   }
 
   Widget _buildFilterChip(
     String label,
     bool isSelected,
-    ColorScheme colorScheme,
-  ) {
+    ColorScheme colorScheme, {
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedFilter = label;
-        });
-      },
+      onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
@@ -528,7 +623,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
           borderRadius: BorderRadius.circular(24),
           border: isSelected
               ? null
-              : Border.all(color: Colors.white.withOpacity(0.1)),
+              : Border.all(color: ColorConstants.borderWhite10),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -569,6 +664,13 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
     else if (isTablet)
       crossAxisCount = 2;
 
+    // Use a guaranteed minimum cell height (mainAxisExtent) instead of a
+    // childAspectRatio. The ratio tied cell height to column width, which on
+    // narrow handsets shrank the card and clipped the specialization /
+    // toggle row (57px overflow). A responsive extent keeps the card tall
+    // enough on every device size.
+    final double mainAxisExtent = isMobile ? 258 : (isTablet ? 240 : 210);
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -576,7 +678,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
         crossAxisCount: crossAxisCount,
         crossAxisSpacing: 24,
         mainAxisSpacing: 24,
-        childAspectRatio: 1.7,
+        mainAxisExtent: mainAxisExtent,
       ),
       itemCount: doctors.length,
       itemBuilder: (context, index) {
@@ -587,7 +689,6 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
 
   Widget _buildDoctorCard(Doctor doctor, ColorScheme colorScheme) {
     final bool isPending = doctor.isPending ?? false;
-    final Color specialtyColor = doctor.specialtyColor;
 
     return GestureDetector(
       onTap: () async {
@@ -610,9 +711,9 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E),
+          color: ColorConstants.primary,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          border: Border.all(color: ColorConstants.borderWhite10),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -625,13 +726,6 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
                 const Spacer(),
                 Column(
                   children: [
-                    // Row(
-                    //   children: [
-                    //     _buildIconButton(Icons.visibility, colorScheme),
-                    //     const SizedBox(width: 4),
-                    //     _buildIconButton(Icons.edit, colorScheme),
-                    //   ],
-                    // ),
                     if (isPending) ...[
                       const SizedBox(height: 8),
                       Container(
@@ -640,7 +734,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest,
+                          color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -648,7 +742,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
-                            color: colorScheme.onSurfaceVariant,
+                            color: Colors.white,
                           ),
                         ),
                       ),
@@ -664,7 +758,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
-                color: colorScheme.onSurface,
+                color: Colors.white,
               ),
             ),
             Text(
@@ -674,9 +768,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
-                color: specialtyColor == Colors.pink
-                    ? colorScheme.primary
-                    : colorScheme.tertiary,
+                color: Colors.white.withOpacity(0.85),
               ),
             ),
             const SizedBox(height: 4),
@@ -685,7 +777,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
                 Icon(
                   Icons.work_history,
                   size: 16,
-                  color: colorScheme.onSurfaceVariant,
+                  color: Colors.white.withOpacity(0.85),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
@@ -696,7 +788,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: colorScheme.onSurfaceVariant,
+                      color: Colors.white.withOpacity(0.85),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -705,7 +797,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
             ),
             const Spacer(),
             const SizedBox(height: 12),
-            Divider(height: 1, color: Colors.white.withOpacity(0.05)),
+            Divider(height: 1, color: Colors.white.withOpacity(0.2)),
             const SizedBox(height: 12),
             if (isPending)
               SizedBox(
@@ -713,8 +805,8 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
                 child: ElevatedButton(
                   onPressed: () {},
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: colorScheme.secondaryContainer,
-                    foregroundColor: colorScheme.onSecondaryContainer,
+                    backgroundColor: Colors.white,
+                    foregroundColor: ColorConstants.primary,
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -740,7 +832,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: colorScheme.onSurfaceVariant,
+                          color: Colors.white.withOpacity(0.85),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -751,19 +843,6 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
                       ),
                     ],
                   ),
-                  // IconButton(
-                  //   onPressed: () {},
-                  //   icon: Icon(
-                  //     Icons.block,
-                  //     color: colorScheme.error.withOpacity(0.6),
-                  //     size: 20,
-                  //   ),
-                  //   padding: EdgeInsets.zero,
-                  //   constraints: const BoxConstraints.tightFor(
-                  //     width: 32,
-                  //     height: 32,
-                  //   ),
-                  // ),
                 ],
               ),
           ],
@@ -788,10 +867,8 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
       height: 64,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-        color: isPending
-            ? colorScheme.surfaceContainerHighest
-            : colorScheme.primaryContainer.withOpacity(0.2),
+        border: Border.all(color: Colors.white.withOpacity(0.2)),
+        color: Colors.white.withOpacity(0.15),
       ),
       child: Center(
         child: Text(
@@ -799,7 +876,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
           style: GoogleFonts.plusJakartaSans(
             fontSize: 20,
             fontWeight: FontWeight.w700,
-            color: colorScheme.primary,
+            color: Colors.white,
           ),
         ),
       ),
@@ -834,8 +911,8 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
         padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
           color: doctor.isActive
-              ? colorScheme.primary
-              : colorScheme.surfaceContainerHighest,
+              ? Colors.white
+              : Colors.white.withOpacity(0.3),
           borderRadius: BorderRadius.circular(16),
         ),
         child: AnimatedAlign(
@@ -848,8 +925,8 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen>
             height: 16,
             decoration: BoxDecoration(
               color: doctor.isActive
-                  ? Colors.white
-                  : colorScheme.onSurfaceVariant.withOpacity(0.4),
+                  ? ColorConstants.primary
+                  : Colors.white,
               shape: BoxShape.circle,
             ),
           ),

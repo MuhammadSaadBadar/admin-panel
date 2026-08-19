@@ -6,6 +6,7 @@ import '../../../core/constants/color_constants.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/routes/route_names.dart';
 import '../../../core/widgets/custom_appbar.dart';
+import '../../../core/widgets/dashboard_background.dart';
 import '../controllers/appointment_detail_controller.dart';
 import '../models/appointment.dart';
 import '../repositories/appointment_repository.dart';
@@ -80,15 +81,17 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen>
 
     return Scaffold(
       backgroundColor: ColorConstants.scaffoldBackground,
-      body: SafeArea(
-        child: isMobile
-            ? _buildMain(isMobile)
-            : Row(
-                children: [
-                  _buildSidebar(),
-                  Expanded(child: _buildMain(isMobile)),
-                ],
-              ),
+      body: DashboardBackground(
+        child: SafeArea(
+          child: isMobile
+              ? _buildMain(isMobile)
+              : Row(
+                  children: [
+                    _buildSidebar(),
+                    Expanded(child: _buildMain(isMobile)),
+                  ],
+                ),
+        ),
       ),
       bottomNavigationBar: null,
     );
@@ -254,6 +257,8 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen>
                     _buildMetadataCard(appointment, isMobile),
                     SizedBox(height: isMobile ? 16 : 24),
                     _buildActionsCard(appointment, isMobile),
+                    SizedBox(height: isMobile ? 16 : 24),
+                    _buildPaymentCard(appointment, isMobile),
                     SizedBox(height: isMobile ? 80 : 100),
                   ],
                 ),
@@ -360,11 +365,11 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen>
   }
 
   Widget _buildPatientCard(Appointment appointment, bool isMobile) {
-    return _SectionCard(
+    return _SectionCardforDP(
       isMobile: isMobile,
       title: 'Patient',
       icon: Icons.person,
-      iconColor: ColorConstants.primary,
+      iconColor: ColorConstants.secondary,
       child: Row(
         children: [
           _avatar(appointment.patient.fullName, isMobile),
@@ -378,7 +383,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen>
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: isMobile ? 16 : 18,
                     fontWeight: FontWeight.w700,
-                    color: ColorConstants.onSurface,
+                    color: ColorConstants.onPrimary,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -389,7 +394,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen>
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: isMobile ? 12 : 13,
                     fontWeight: FontWeight.w500,
-                    color: ColorConstants.onSurfaceVariant,
+                    color: ColorConstants.onPrimary,
                   ),
                 ),
               ],
@@ -417,7 +422,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen>
   }
 
   Widget _buildDoctorCard(Appointment appointment, bool isMobile) {
-    return _SectionCard(
+    return _SectionCardforDP(
       isMobile: isMobile,
       title: 'Doctor',
       icon: Icons.medical_services,
@@ -435,7 +440,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen>
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: isMobile ? 16 : 18,
                     fontWeight: FontWeight.w700,
-                    color: ColorConstants.onSurface,
+                    color: ColorConstants.onPrimary,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -446,7 +451,7 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen>
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: isMobile ? 12 : 13,
                     fontWeight: FontWeight.w500,
-                    color: ColorConstants.onSurfaceVariant,
+                    color: ColorConstants.onPrimary,
                   ),
                 ),
               ],
@@ -683,6 +688,111 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen>
                 color: ColorConstants.onSurfaceVariant,
               ),
             ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentCard(Appointment appointment, bool isMobile) {
+    final payment = appointment.payment;
+    final hasPayment = appointment.hasPayment;
+
+    return _SectionCard(
+      isMobile: isMobile,
+      title: 'Payment',
+      icon: Icons.payments_outlined,
+      iconColor: ColorConstants.tertiary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!hasPayment) ...[
+            Text(
+              'No payment required for this appointment.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                fontStyle: FontStyle.italic,
+                color: ColorConstants.onSurfaceVariant,
+              ),
+            ),
+          ] else ...[
+            _InfoRow(
+              icon: Icons.payments,
+              label: 'Status',
+              value: payment!.status.displayLabel,
+              isMobile: isMobile,
+            ),
+            _InfoRow(
+              icon: Icons.attach_money,
+              label: 'Doctor Fee',
+              value: 'Rs. ${payment.doctorFee}',
+              isMobile: isMobile,
+            ),
+            _InfoRow(
+              icon: Icons.percent,
+              label: 'Admin Commission',
+              value:
+                  '${payment.commissionPercentage}% (Rs. ${payment.commissionAmount})',
+              isMobile: isMobile,
+            ),
+            _InfoRow(
+              icon: Icons.account_balance_wallet,
+              label: 'Total Payable',
+              value: 'Rs. ${payment.totalAmount}',
+              isMobile: isMobile,
+            ),
+            if (payment.patientMarkedPaidAt != null)
+              _InfoRow(
+                icon: Icons.hourglass_top,
+                label: 'Marked Paid',
+                value: _formatDateTime(payment.patientMarkedPaidAt),
+                isMobile: isMobile,
+              ),
+            if (payment.confirmedAt != null)
+              _InfoRow(
+                icon: Icons.verified,
+                label: 'Confirmed At',
+                value: _formatDateTime(payment.confirmedAt),
+                isMobile: isMobile,
+              ),
+            if (payment.paymentReference.isNotEmpty)
+              _InfoRow(
+                icon: Icons.receipt_long,
+                label: 'Reference',
+                value: payment.paymentReference,
+                isMobile: isMobile,
+              ),
+            const SizedBox(height: 12),
+            Obx(() {
+              final isProcessing = _controller.isProcessingAction.value;
+              if (appointment.canVerifyPayment) {
+                return _ActionChip(
+                  label: isProcessing
+                      ? 'Verifying...'
+                      : 'Verify Payment & Confirm',
+                  icon: Icons.verified_user,
+                  color: ColorConstants.success,
+                  isMobile: isMobile,
+                  onPressed: () {
+                    if (isProcessing) return;
+                    _controller.verifyPayment();
+                  },
+                );
+              }
+              if (appointment.patientCanMarkPaid) {
+                return _ActionChip(
+                  label: isProcessing ? 'Recording...' : 'I Have Paid',
+                  icon: Icons.check_circle_outline,
+                  color: ColorConstants.tertiary,
+                  isMobile: isMobile,
+                  onPressed: () {
+                    if (isProcessing) return;
+                    _controller.markPaid();
+                  },
+                );
+              }
+              return const SizedBox.shrink();
+            }),
           ],
         ],
       ),
@@ -1125,6 +1235,56 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen>
     if (parts.length == 1) return parts[0].substring(0, 1).toUpperCase();
     return (parts[0].substring(0, 1) + parts.last.substring(0, 1))
         .toUpperCase();
+  }
+}
+
+class _SectionCardforDP extends StatelessWidget {
+  final bool isMobile;
+  final String title;
+  final IconData icon;
+  final Color iconColor;
+  final Widget child;
+
+  const _SectionCardforDP({
+    required this.isMobile,
+    required this.title,
+    required this.icon,
+    required this.iconColor,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      decoration: BoxDecoration(
+        color: ColorConstants.primary,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ColorConstants.borderWhite10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: iconColor, size: isMobile ? 20 : 24),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: isMobile ? 18 : 20,
+                  fontWeight: FontWeight.w600,
+                  color: ColorConstants.onPrimary,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: isMobile ? 12 : 16),
+          child,
+        ],
+      ),
+    );
   }
 }
 

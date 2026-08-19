@@ -44,7 +44,24 @@ class AuthInterceptor extends Interceptor {
     _dio = dio;
   }
 
-  bool _isAuthEndpoint(String path) => path.contains('/auth/');
+  /// Whether [path] is a *public* auth endpoint that may legitimately return
+  /// 401 and must never recurse into the refresh flow (login, refresh, logout,
+  /// and the public password-reset steps).
+  ///
+  /// NOTE: This must match the PUBLIC endpoints only. Authenticated auth
+  /// endpoints such as `/auth/me/` and `/auth/password/change/` are NOT public
+  /// — they use the access token and must still trigger a token refresh on 401.
+  bool _isAuthEndpoint(String path) {
+    return path.contains('/auth/login/') ||
+        path.contains('/auth/register/') ||
+        path.contains('/auth/verify-email/') ||
+        path.contains('/auth/resend-verification/') ||
+        path.contains('/auth/token/refresh/') ||
+        path.contains('/auth/logout/') ||
+        path.contains('/auth/password/forgot/') ||
+        path.contains('/auth/password/verify-otp/') ||
+        path.contains('/auth/password/reset/');
+  }
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {

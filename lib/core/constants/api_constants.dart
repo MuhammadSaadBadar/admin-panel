@@ -44,6 +44,10 @@ class ApiConstants {
       '$apiPrefix/accounts/me/patient-profile/'; // GET/PUT/PATCH — own patient profile
   static const String accountsMeDoctorProfile =
       '$apiPrefix/accounts/me/doctor-profile/'; // GET/PUT/PATCH — own doctor profile
+  static const String accountsMeSubscription =
+      '$apiPrefix/accounts/me/subscription/'; // GET — patient only, subscription status + payment methods (price shown to patient)
+  static const String accountsPaymentMethods =
+      '$apiPrefix/accounts/payment-methods/'; // GET (all) / PATCH (admin only) — platform JazzCash/EasyPaisa/bank details + subscription price/currency
   static const String accountsDoctors =
       '$apiPrefix/accounts/doctors/'; // GET — list doctors
   static const String accountsDoctorsDetail =
@@ -54,6 +58,8 @@ class ApiConstants {
       '$apiPrefix/accounts/patients'; // GET/PATCH — append '/{id}/'
   static const String accountsPatientAssignDoctorSuffix =
       '/assign-doctor/'; // POST — append to patient detail URL, admin assigns doctor
+  static const String accountsPatientMarkPaidSuffix =
+      '/mark-paid/'; // POST — append to patient detail URL, admin records manual payment {payment_reference?, amount_paid?}
 
   // ---------------- APPOINTMENTS ----------------
   static const String appointments =
@@ -66,6 +72,12 @@ class ApiConstants {
       '/reschedule/'; // PATCH — append to appointment detail URL
   static const String appointmentStatusSuffix =
       '/status/'; // POST — append to appointment detail URL, state machine
+  static const String appointmentRateSuffix =
+      '/rate/'; // POST — append to appointment detail URL, patient-only {score: 1-5, comment?}, completed appointments only
+  static const String appointmentPaymentConfirmSuffix =
+      '/payment/confirm/'; // POST — append to appointment detail URL, doctor/admin verifies payment received (also confirms appointment)
+  static const String appointmentPaymentMarkPaidSuffix =
+      '/payment/mark-paid/'; // POST — append to appointment detail URL, patient claims they paid the consultation fee
 
   // ---------------- HEALTH ----------------
   static const String healthPregnancyProgress =
@@ -138,6 +150,8 @@ class ApiConstants {
       '$apiPrefix/notifications/'; // GET — own inbox, newest first
   static const String notificationsMarkAllRead =
       '$apiPrefix/notifications/mark-all-read/'; // POST — marks all as read
+  static const String notificationsUnreadCount =
+      '$apiPrefix/notifications/unread-count/'; // GET — returns {"unread_count": N} for the bell badge
   static const String notificationsDetail =
       '$apiPrefix/notifications'; // GET — append '/{id}/'
   static const String notificationMarkReadSuffix =
@@ -158,8 +172,13 @@ class ApiConstants {
   // ---------------- REPORTS ----------------
   static const String reportsPatientSummary =
       '$apiPrefix/reports/patient-summary/'; // GET — cross-app aggregation, computed live
+  static const String reportsDoctorDashboard =
+      '$apiPrefix/reports/doctor-dashboard/'; // GET — doctor-only, one call for the doctor app home screen
   static const String reportsAdminStats =
-      '$apiPrefix/reports/admin/stats/'; // GET — admin only, dashboard counts
+      '$apiPrefix/reports/admin/stats/'; // GET — admin only, dashboard counts.
+  // Optional query params: ?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD (date-picker filter).
+  // Response also includes active_users_last_30_days and
+  // new_patients_growth_percent (nullable until a full prior month exists).
   static const String reportsSearch =
       '$apiPrefix/reports/search/'; // GET — admin only, requires ?q= (min 2 chars)
 

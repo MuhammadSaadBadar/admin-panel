@@ -1,3 +1,6 @@
+import 'package:admin/features/notifications/controllers/notification_controller.dart';
+import 'package:admin/features/notifications/controllers/notification_detail_controller.dart';
+import 'package:admin/features/notifications/repositories/notification_repository.dart';
 import 'package:get/get.dart';
 
 import '../../core/constants/api_constants.dart';
@@ -15,12 +18,19 @@ import '../../features/doctors/controllers/doctor_detail_controller.dart';
 import '../../features/doctors/controllers/doctor_invite_controller.dart';
 import '../../features/doctors/controllers/doctor_list_controller.dart';
 import '../../features/doctors/repositories/doctor_repository.dart';
+import '../../features/patients/controllers/diet_plan_controller.dart';
+import '../../features/patients/controllers/medication_controller.dart';
 import '../../features/patients/controllers/patient_list_controller.dart';
 import '../../features/patients/controllers/patient_registration_controller.dart';
 import '../../features/patients/repositories/patient_repository.dart';
 import '../../features/profile/controllers/change_password_controller.dart';
 import '../../features/profile/controllers/profile_controller.dart';
 import '../../features/profile/repositories/profile_repository.dart';
+import '../../features/search/controllers/search_controller.dart';
+import '../../features/search/repositories/search_repository.dart';
+import '../../features/sos/controllers/sos_controller.dart';
+import '../../features/sos/controllers/sos_detail_controller.dart';
+import '../../features/sos/repositories/sos_repository.dart';
 
 class InitialBinding extends Bindings {
   @override
@@ -99,6 +109,18 @@ class InitialBinding extends Bindings {
       () => ProfileRepository(Get.find<ApiClient>()),
       fenix: true,
     );
+    Get.lazyPut<SosRepository>(
+      () => SosRepository(Get.find<ApiClient>()),
+      fenix: true,
+    );
+    Get.lazyPut<NotificationRepository>(
+      () => NotificationRepository(Get.find<ApiClient>()),
+      fenix: true,
+    );
+    Get.lazyPut<SearchRepository>(
+      () => SearchRepository(Get.find<ApiClient>()),
+      fenix: true,
+    );
 
     // 4. Auth service
     Get.lazyPut<AuthService>(
@@ -138,6 +160,14 @@ class InitialBinding extends Bindings {
       () => PatientRegistrationController(Get.find<AuthRepository>()),
       fenix: true,
     );
+    Get.lazyPut<DietPlanController>(
+      () => DietPlanController(Get.find<PatientRepository>()),
+      fenix: true,
+    );
+    Get.lazyPut<MedicationController>(
+      () => MedicationController(Get.find<PatientRepository>()),
+      fenix: true,
+    );
     Get.lazyPut<AppointmentController>(
       () => AppointmentController(Get.find<AppointmentRepository>()),
       fenix: true,
@@ -152,6 +182,26 @@ class InitialBinding extends Bindings {
     );
     Get.lazyPut<ChangePasswordController>(
       () => ChangePasswordController(Get.find<ProfileRepository>()),
+      fenix: true,
+    );
+    Get.lazyPut<SosController>(
+      () => SosController(Get.find<SosRepository>()),
+      fenix: true,
+    );
+    Get.lazyPut<SosDetailController>(
+      () => SosDetailController(Get.find<SosRepository>()),
+      fenix: true,
+    );
+    Get.lazyPut<NotificationController>(
+      () => NotificationController(Get.find<NotificationRepository>()),
+      fenix: true,
+    );
+    Get.lazyPut<NotificationDetailController>(
+      () => NotificationDetailController(Get.find<NotificationRepository>()),
+      fenix: true,
+    );
+    Get.lazyPut<SearchController>(
+      () => SearchController(Get.find<SearchRepository>()),
       fenix: true,
     );
   }

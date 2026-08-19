@@ -7,6 +7,8 @@ import '../../../core/network/api_client.dart';
 import '../../../core/routes/route_names.dart';
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/widgets/custom_appbar.dart';
+import '../../../core/widgets/dashboard_background.dart';
+import '../../notifications/widgets/notification_bell.dart';
 import '../controllers/appointment_controller.dart';
 import '../models/appointment.dart';
 import '../repositories/appointment_repository.dart';
@@ -79,15 +81,17 @@ class _AppointmentManagementScreenState
               },
             )
           : null,
-      body: SafeArea(
-        child: isMobile
-            ? _buildMobileLayout(isMobile)
-            : Row(
-                children: [
-                  _buildSidebar(),
-                  Expanded(child: _buildMobileLayout(isMobile)),
-                ],
-              ),
+      body: DashboardBackground(
+        child: SafeArea(
+          child: isMobile
+              ? _buildMobileLayout(isMobile)
+              : Row(
+                  children: [
+                    _buildSidebar(),
+                    Expanded(child: _buildMobileLayout(isMobile)),
+                  ],
+                ),
+        ),
       ),
     );
   }
@@ -243,17 +247,8 @@ class _AppointmentManagementScreenState
   Widget _buildTopAppBar(bool isMobile) {
     return CustomAppBar(
       title: 'Appointments',
-      showMenuButton: isMobile,
-      actions: [
-        IconButton(
-          onPressed: () {},
-          icon: Icon(
-            Icons.notifications,
-            color: ColorConstants.primary,
-            size: isMobile ? 20 : 24,
-          ),
-        ),
-      ],
+      showBackButton: isMobile,
+      actions: const [NotificationBell()],
     );
   }
 

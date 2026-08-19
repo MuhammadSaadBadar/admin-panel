@@ -12,7 +12,7 @@ paths:
         account regardless of anything else in the payload — doctors and admins are
         never created this way (see Doctor Invite / seed_admin). Sends a verification
         email; the account cannot log in until `verify-email/` is called with the
-        token from that email.
+        code from that email.
       summary: Register a new patient
       tags:
       - Auth
@@ -71,11 +71,13 @@ paths:
   /api/v1/auth/verify-email/:
     post:
       operationId: auth_verify_email_create
-      description: 'Consumes the single-use token emailed to the patient on registration
-        (link format: `{FRONTEND_URL}/verify-email?token=...`). The frontend reads
-        `token` from that deep link''s query string and POSTs it here. Token expires
-        after `EMAIL_VERIFICATION_TOKEN_EXPIRY_HOURS` (default 48h).'
-      summary: Verify email with token
+      description: Consumes the 6-digit OTP code emailed to the patient on registration
+        — a code, not a link, since patients are mobile-app-only and an emailed https://
+        link just opens a browser, not the app, without real deep-link setup. Only
+        the most recently requested code is valid (requesting a new one via `resend-verification/`
+        invalidates any previous unused code). Expires after `EMAIL_VERIFICATION_TOKEN_EXPIRY_HOURS`
+        (default 48h).
+      summary: Verify email with a code
       tags:
       - Auth
       requestBody:
@@ -86,7 +88,8 @@ paths:
             examples:
               Request:
                 value:
-                  token: Pw5n22QuyiX8_7f-dQozm127jEjJ9Vz0gV7gsVH4qfE
+                  email: sara.ahmed@example.com
+                  otp_code: '482913'
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/VerifyEmailRequest'
@@ -115,19 +118,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/DetailResponse'
               examples:
-                400Invalid/expiredToken:
+                400Invalid/expiredCode:
                   value:
-                    detail: Verification token has expired. Please request a new one.
+                    detail: This code has expired. Please request a new one.
                     errors: null
-                  summary: 400 Invalid/expired token
+                  summary: 400 Invalid/expired code
           description: ''
   /api/v1/auth/resend-verification/:
     post:
       operationId: auth_resend_verification_create
-      description: Re-issues a fresh verification token/email for an unverified account.
-        Always returns 200 with the same generic message whether or not the email
-        exists/is already verified — this is intentional (does not leak account existence),
-        so don't treat the response body as confirmation the email was actually sent.
+      description: Re-issues a fresh verification code/email for an unverified account
+        (invalidates any previous unused code). Always returns 200 with the same generic
+        message whether or not the email exists/is already verified — this is intentional
+        (does not leak account existence), so don't treat the response body as confirmation
+        the email was actually sent.
       summary: Resend the verification email
       tags:
       - Auth
@@ -628,10 +632,11 @@ paths:
   /api/v1/accounts/doctors/invite/accept/:
     post:
       operationId: accounts_doctors_invite_accept_create
-      description: Public (no auth) — the doctor reaches this via the emailed invite
-        link's token. Sets the doctor's password and activates the account. Unlike
-        patient registration, this account is **immediately email-verified** (accepting
-        the invite email already proves ownership) and can log in right away.
+      description: Public (no auth) — the doctor reaches this via the 6-digit OTP
+        code emailed to them (a code, not a link, since the doctor app is mobile-only).
+        Sets the doctor's password and activates the account. Unlike patient registration,
+        this account is **immediately email-verified** (entering the invite code already
+        proves ownership) and can log in right away.
       summary: Accept a doctor invite
       tags:
       - Accounts
@@ -643,7 +648,8 @@ paths:
             examples:
               Request:
                 value:
-                  token: 8fK2mZ...invite-token...
+                  email: dr.ayesha@example.com
+                  otp_code: '482913'
                   password: DoctorPass123!
                   first_name: Ayesha
                   last_name: Malik
@@ -936,13 +942,155 @@ paths:
                     is_accepting_patients: true
                   summary: 200 OK
           description: ''
+  /api/v1/accounts/me/subscription/:
+    get:
+      operationId: accounts_me_subscription_retrieve
+      description: Patient-only. **Retired as of Phase 16** — monetization moved to
+        a per-consultation fee (see `GET /accounts/doctors/`'s `consultation_fee`
+        and `payment` on `GET /appointments/{id}/`), not this flat trial-then-subscribe
+        model. `is_active` here no longer blocks anything — kept only so nothing breaks
+        if a client still calls this. `payment_methods` (JazzCash/EasyPaisa/bank)
+        is still current and used for consultation payments too.
+      summary: My subscription status (patient only) — retired, kept for backward
+        compatibility
+      tags:
+      - Accounts
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MySubscriptionResponse'
+              examples:
+                200OK—StillOnTrial:
+                  value:
+                    trial_ends_at: '2026-08-09T10:30:00Z'
+                    is_paid: false
+                    paid_at: null
+                    payment_reference: ''
+                    amount_paid: null
+                    is_active: true
+                    days_remaining: 6
+                    payment_methods:
+                      jazzcash_number: 0300-1234567
+                      jazzcash_account_title: Mama Health
+                      easypaisa_number: ''
+                      easypaisa_account_title: ''
+                      bank_name: Meezan Bank
+                      bank_account_title: Mama Health
+                      bank_account_number: 01234567890123
+                      bank_iban: PK00MEZN0001234567890123
+                      subscription_price_amount: '1500.00'
+                      subscription_price_currency: PKR
+                  summary: 200 OK — still on trial
+          description: ''
+  /api/v1/accounts/payment-methods/:
+    get:
+      operationId: accounts_payment_methods_retrieve
+      description: Any authenticated user — patients need this to know where to send
+        payment. See `PATCH` below for who can change it.
+      summary: Get platform payment methods
+      tags:
+      - Accounts
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformPaymentMethod'
+              examples:
+                200OK:
+                  value:
+                    jazzcash_number: 0300-1234567
+                    jazzcash_account_title: Mama Health
+                    easypaisa_number: ''
+                    easypaisa_account_title: ''
+                    bank_name: Meezan Bank
+                    bank_account_title: Mama Health
+                    bank_account_number: 01234567890123
+                    bank_iban: PK00MEZN0001234567890123
+                    subscription_price_amount: '1500.00'
+                    subscription_price_currency: PKR
+                    updated_at: '2026-08-02T10:00:00Z'
+                  summary: 200 OK
+          description: ''
+    patch:
+      operationId: accounts_payment_methods_partial_update
+      description: Admin-only. Leave a method's fields blank to hide it from what
+        patients see — the app should only display methods with a non-empty number/account.
+        `subscription_price_amount`/`subscription_price_currency` (default `PKR`)
+        is what the app should tell a patient to pay — optional, leave unset to show
+        payment methods without a specific figure.
+      summary: Update platform payment methods (admin only)
+      tags:
+      - Accounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPlatformPaymentMethodRequest'
+            examples:
+              Request:
+                value:
+                  jazzcash_number: 0300-1234567
+                  jazzcash_account_title: Mama Health
+                  subscription_price_amount: '1500.00'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPlatformPaymentMethodRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPlatformPaymentMethodRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformPaymentMethod'
+          description: ''
   /api/v1/accounts/doctors/:
     get:
       operationId: accounts_doctors_list
-      description: Any authenticated role (patient/doctor/admin) — e.g. a patient
-        browsing doctors to book an appointment with. Paginated.
+      description: 'Any authenticated role (patient/doctor/admin) — e.g. a patient
+        browsing doctors to book an appointment with. Paginated. Free city/area search,
+        no paid maps API: `?city=` matches one of the fixed dropdown values (see `DoctorProfile.city`
+        choices, e.g. `lahore`, `karachi`); `?area=` is a case-insensitive partial
+        match on the doctor''s free-text area. `?lat=&lng=&radius_km=` (radius_km
+        defaults to 20, results sorted nearest-first) computes plain Haversine distance
+        in Python to every doctor who has set a location on their profile — no Google
+        Places/Mapbox key needed. Combine `city`/`area` with `lat`/`lng` to narrow
+        first, then sort by distance. `distance_km` is `null` unless `lat`/`lng` were
+        supplied.'
       summary: List doctors
       parameters:
+      - in: query
+        name: area
+        schema:
+          type: string
+        description: Case-insensitive partial match on the doctor's area, e.g. `DHA`.
+      - in: query
+        name: city
+        schema:
+          type: string
+        description: Exact match against the fixed city dropdown, e.g. `lahore`.
+      - in: query
+        name: lat
+        schema:
+          type: number
+          format: double
+        description: Patient's current latitude, for "near me" search.
+      - in: query
+        name: lng
+        schema:
+          type: number
+          format: double
+        description: Patient's current longitude, for "near me" search.
       - name: page
         required: false
         in: query
@@ -955,6 +1103,12 @@ paths:
         description: Number of results to return per page.
         schema:
           type: integer
+      - in: query
+        name: radius_km
+        schema:
+          type: number
+          format: double
+        description: Only with lat/lng. Max distance in km. Default 20.
       tags:
       - Accounts
       security:
@@ -989,9 +1143,83 @@ paths:
                           years_of_experience: 8
                           bio: Board-certified obstetrician.
                           is_accepting_patients: true
+                          city: lahore
+                          area: DHA Phase 5
+                          latitude: '31.470800'
+                          longitude: '74.410400'
+                        distance_km: null
                   summary: 200 OK
+                200OK—Near-meSearch(?lat=&lng=):
+                  value:
+                    count: 123
+                    next: http://api.example.org/accounts/?page=4
+                    previous: http://api.example.org/accounts/?page=2
+                    results:
+                    - count: 1
+                      next: null
+                      previous: null
+                      results:
+                      - id: 4
+                        email: dr.ayesha@example.com
+                        first_name: Ayesha
+                        last_name: Malik
+                        phone_number: '+923009876543'
+                        is_active: true
+                        date_joined: '2026-01-10T09:00:00Z'
+                        doctor_profile:
+                          specialization: OB-GYN
+                          license_number: PMC-12345
+                          years_of_experience: 8
+                          bio: ''
+                          is_accepting_patients: true
+                          city: lahore
+                          area: DHA Phase 5
+                          latitude: '31.470800'
+                          longitude: '74.410400'
+                        distance_km: 2.35
+                  summary: 200 OK — near-me search (?lat=&lng=)
           description: ''
   /api/v1/accounts/doctors/{id}/:
+    get:
+      operationId: accounts_doctors_retrieve
+      description: 'Read: any authenticated user (e.g. patients browsing doctors to
+        book with). Write: admin only.'
+      summary: Get a single doctor
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - Accounts
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DoctorList'
+              examples:
+                200OK:
+                  value:
+                    id: 4
+                    email: dr.ayesha@example.com
+                    first_name: Ayesha
+                    last_name: Malik
+                    phone_number: '+923009876543'
+                    is_active: true
+                    date_joined: '2026-01-10T09:00:00Z'
+                    doctor_profile:
+                      specialization: OB-GYN
+                      license_number: PMC-12345
+                      years_of_experience: 8
+                      bio: Board-certified obstetrician.
+                      is_accepting_patients: true
+                  summary: 200 OK
+          description: ''
     patch:
       operationId: accounts_doctors_partial_update
       description: 'Admin-only. Typically used to deactivate a doctor (`is_active:
@@ -1038,46 +1266,6 @@ paths:
                     first_name: Ayesha
                     last_name: Malik
                     phone_number: '+923009876543'
-                    doctor_profile:
-                      specialization: OB-GYN
-                      license_number: PMC-12345
-                      years_of_experience: 8
-                      bio: Board-certified obstetrician.
-                      is_accepting_patients: true
-                  summary: 200 OK
-          description: ''
-    get:
-      operationId: accounts_doctors_retrieve
-      description: 'Read: any authenticated user (e.g. patients browsing doctors to
-        book with). Write: admin only.'
-      summary: Get a single doctor
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this user.
-        required: true
-      tags:
-      - Accounts
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DoctorList'
-              examples:
-                200OK:
-                  value:
-                    id: 4
-                    email: dr.ayesha@example.com
-                    first_name: Ayesha
-                    last_name: Malik
-                    phone_number: '+923009876543'
-                    is_active: true
-                    date_joined: '2026-01-10T09:00:00Z'
                     doctor_profile:
                       specialization: OB-GYN
                       license_number: PMC-12345
@@ -1153,6 +1341,49 @@ paths:
                   summary: 200 OK
           description: ''
   /api/v1/accounts/patients/{id}/:
+    get:
+      operationId: accounts_patients_retrieve
+      description: Same scoping as list — a doctor gets 404 for a patient not assigned
+        to them.
+      summary: Get a single patient
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - Accounts
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientList'
+              examples:
+                200OK:
+                  value:
+                    id: 2
+                    email: sara.ahmed@example.com
+                    first_name: Sara
+                    last_name: Ahmed
+                    phone_number: '+923001234567'
+                    is_active: true
+                    date_joined: '2026-01-15T10:30:00Z'
+                    patient_profile:
+                      date_of_birth: '1995-06-20'
+                      lmp_date: '2026-05-01'
+                      edd_date: null
+                      blood_group: O+
+                      emergency_contact_name: Ahmed Khan
+                      emergency_contact_phone: '+923001112222'
+                      address: House 12, Street 5, Karachi
+                      profile_complete: true
+                  summary: 200 OK
+          description: ''
     patch:
       operationId: accounts_patients_partial_update
       description: 'Admin-only. Typically used to deactivate a patient (`is_active:
@@ -1192,49 +1423,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PatientUpdate'
-              examples:
-                200OK:
-                  value:
-                    id: 2
-                    email: sara.ahmed@example.com
-                    first_name: Sara
-                    last_name: Ahmed
-                    phone_number: '+923001234567'
-                    is_active: true
-                    date_joined: '2026-01-15T10:30:00Z'
-                    patient_profile:
-                      date_of_birth: '1995-06-20'
-                      lmp_date: '2026-05-01'
-                      edd_date: null
-                      blood_group: O+
-                      emergency_contact_name: Ahmed Khan
-                      emergency_contact_phone: '+923001112222'
-                      address: House 12, Street 5, Karachi
-                      profile_complete: true
-                  summary: 200 OK
-          description: ''
-    get:
-      operationId: accounts_patients_retrieve
-      description: Same scoping as list — a doctor gets 404 for a patient not assigned
-        to them.
-      summary: Get a single patient
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this user.
-        required: true
-      tags:
-      - Accounts
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PatientList'
               examples:
                 200OK:
                   value:
@@ -1310,6 +1498,58 @@ paths:
               schema:
                 $ref: '#/components/schemas/DetailResponse'
           description: ''
+  /api/v1/accounts/patients/{id}/mark-paid/:
+    post:
+      operationId: accounts_patients_mark_paid_create
+      description: Manual payment confirmation — this project uses no integrated payment
+        gateway. The admin checks their JazzCash/EasyPaisa/bank account for a matching
+        transfer (see `GET /accounts/payment-methods/` for the account details and
+        price shown to the patient) and marks them paid here, optionally noting a
+        transaction reference and the amount actually received (feeds `total_revenue_collected`/`revenue_this_month`
+        on the admin dashboard — see `GET /reports/admin/stats/`). Once paid, the
+        patient's free-trial soft lock (see `GET /accounts/me/subscription/`) is permanently
+        lifted — there's no expiry/renewal logic since there's no automated payment
+        collection to expire it against.
+      summary: Mark a patient as paid (admin only)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - Accounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarkPatientPaidRequest'
+            examples:
+              Request:
+                value:
+                  payment_reference: JazzCash TXN482913
+                  amount_paid: '1500.00'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MarkPatientPaidRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MarkPatientPaidRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientList'
+              examples:
+                200OK:
+                  value:
+                    detail: Payment recorded. This patient now has full access.
+                  summary: 200 OK
+          description: ''
   /api/v1/appointments/:
     post:
       operationId: appointments_create
@@ -1319,7 +1559,13 @@ paths:
         does **not** provision a real video session in v1 — `meeting_link` stays empty
         until manually filled in (no live video SDK integration). Booking auto-creates
         a `PatientDoctorAssignment` between this patient and doctor if one doesn't
-        already exist, and notifies the doctor.
+        already exist, and notifies the doctor. If the doctor has a `consultation_fee`
+        set (see `GET /accounts/doctors/`), booking also auto-creates a `payment`
+        (fee + the platform's current commission %, both snapshotted — see the `payment`
+        field below) that must be paid and confirmed (`POST .../payment/mark-paid/`
+        then `.../payment/confirm/`) before this appointment can move past `pending`.
+        `payment` is `null` if the doctor has no fee configured (free consultation,
+        nothing blocks confirming it).
       summary: Book an appointment
       tags:
       - Appointments
@@ -1381,6 +1627,15 @@ paths:
                     reason: Routine 20-week checkup
                     doctor_notes: ''
                     cancellation_reason: ''
+                    payment:
+                      doctor_fee: '2000.00'
+                      commission_percentage: '20.00'
+                      commission_amount: '400.00'
+                      total_amount: '2400.00'
+                      status: pending
+                      patient_marked_paid_at: null
+                      confirmed_at: null
+                      payment_reference: ''
                     created_at: '2026-07-29T14:00:00Z'
                     updated_at: '2026-07-29T14:00:00Z'
                   summary: 201 Created
@@ -1469,49 +1724,20 @@ paths:
                         reason: Routine 20-week checkup
                         doctor_notes: ''
                         cancellation_reason: ''
+                        payment:
+                          doctor_fee: '2000.00'
+                          commission_percentage: '20.00'
+                          commission_amount: '400.00'
+                          total_amount: '2400.00'
+                          status: pending
+                          patient_marked_paid_at: null
+                          confirmed_at: null
+                          payment_reference: ''
                         created_at: '2026-07-29T14:00:00Z'
                         updated_at: '2026-07-29T14:00:00Z'
                   summary: 200 OK
           description: ''
   /api/v1/appointments/{id}/:
-    patch:
-      operationId: appointments_partial_update
-      description: |-
-        Scoping is bespoke (not PatientScopedQuerysetMixin): an appointment has
-        two distinct parties, so a doctor's view must be `doctor=request.user`,
-        not "any patient this doctor is assigned to" (which would leak other
-        doctors' appointments with a shared patient).
-      summary: Update appointment fields (rarely used directly — prefer the /status/
-        and /doctor-notes/ actions below)
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this appointment.
-        required: true
-      tags:
-      - Appointments
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedAppointmentRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedAppointmentRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedAppointmentRequest'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Appointment'
-          description: ''
     get:
       operationId: appointments_retrieve
       description: |-
@@ -1559,9 +1785,111 @@ paths:
                     reason: Routine 20-week checkup
                     doctor_notes: ''
                     cancellation_reason: ''
+                    payment:
+                      doctor_fee: '2000.00'
+                      commission_percentage: '20.00'
+                      commission_amount: '400.00'
+                      total_amount: '2400.00'
+                      status: pending
+                      patient_marked_paid_at: null
+                      confirmed_at: null
+                      payment_reference: ''
                     created_at: '2026-07-29T14:00:00Z'
                     updated_at: '2026-07-29T14:00:00Z'
                   summary: 200 OK
+          description: ''
+    patch:
+      operationId: appointments_partial_update
+      description: |-
+        Scoping is bespoke (not PatientScopedQuerysetMixin): an appointment has
+        two distinct parties, so a doctor's view must be `doctor=request.user`,
+        not "any patient this doctor is assigned to" (which would leak other
+        doctors' appointments with a shared patient).
+      summary: Update appointment fields (rarely used directly — prefer the /status/
+        and /doctor-notes/ actions below)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this appointment.
+        required: true
+      tags:
+      - Appointments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAppointmentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAppointmentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAppointmentRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+          description: ''
+  /api/v1/appointments/{id}/payment/confirm/:
+    post:
+      operationId: appointments_payment_confirm_create
+      description: Doctor (the appointment's own doctor) or admin only. Step 2 of
+        2 — verifies the patient's claimed payment actually arrived (JazzCash/EasyPaisa/bank,
+        checked manually outside the app). This **also confirms the appointment itself**
+        (`pending` → `confirmed`) in the same call, since for this project's manual-payment
+        flow "payment received" and "appointment confirmed" are the same real-world
+        moment. 400 if there's no payment on this appointment, or it's already confirmed.
+      summary: Doctor/admin confirms the payment was received
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this appointment.
+        required: true
+      tags:
+      - Appointments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmPaymentRequest'
+            examples:
+              Request:
+                value:
+                  payment_reference: JazzCash TXN482913
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConfirmPaymentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConfirmPaymentRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                400AlreadyConfirmed:
+                  value:
+                    detail: This payment has already been confirmed.
+                    errors: null
+                  summary: 400 Already confirmed
           description: ''
   /api/v1/appointments/{id}/doctor-notes/:
     patch:
@@ -1624,9 +1952,138 @@ paths:
                     reason: Routine 20-week checkup
                     doctor_notes: ''
                     cancellation_reason: ''
+                    payment:
+                      doctor_fee: '2000.00'
+                      commission_percentage: '20.00'
+                      commission_amount: '400.00'
+                      total_amount: '2400.00'
+                      status: pending
+                      patient_marked_paid_at: null
+                      confirmed_at: null
+                      payment_reference: ''
                     created_at: '2026-07-29T14:00:00Z'
                     updated_at: '2026-07-29T14:00:00Z'
                   summary: 200 OK
+          description: ''
+  /api/v1/appointments/{id}/payment/mark-paid/:
+    post:
+      operationId: appointments_payment_mark_paid_create
+      description: Patient-only, and only the appointment's own patient. Step 1 of
+        2 in the manual payment flow (no payment gateway) — the patient sends the
+        amount shown in `payment.total_amount` via JazzCash/EasyPaisa/bank (see `GET
+        /accounts/payment-methods/`) outside the app, then taps this to flag it here.
+        This does **not** confirm the appointment — that only happens once the doctor/admin
+        verifies via `POST /appointments/{id}/payment/confirm/`. 400 if there's no
+        payment on this appointment (the doctor has no consultation fee set — nothing
+        to pay) or it's already been marked/confirmed.
+      summary: Patient marks the consultation fee as paid
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this appointment.
+        required: true
+      tags:
+      - Appointments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentRequest'
+            examples:
+              Request:
+                value: {}
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AppointmentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AppointmentRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                400NoPaymentRequired:
+                  value:
+                    detail: This appointment has no payment associated with it.
+                    errors: null
+                  summary: 400 No payment required
+          description: ''
+  /api/v1/appointments/{id}/rate/:
+    post:
+      operationId: appointments_rate_create
+      description: Patient-only, and only the appointment's own patient. Only allowed
+        once the appointment is `completed` (400 otherwise), and only once per appointment
+        (400 on a second attempt) — this is the data behind a doctor's `average_rating`/`total_ratings`
+        (see `GET /accounts/doctors/`) and the admin dashboard's `average_doctor_rating`.
+      summary: Rate a completed appointment (patient only)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this appointment.
+        required: true
+      tags:
+      - Appointments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DoctorRatingRequest'
+            examples:
+              Request:
+                value:
+                  score: 5
+                  comment: Very attentive and explained everything clearly.
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DoctorRatingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DoctorRatingRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DoctorRating'
+              examples:
+                201Created:
+                  value:
+                    id: 1
+                    score: 5
+                    comment: Very attentive and explained everything clearly.
+                    created_at: '2026-08-06T10:00:00Z'
+                  summary: 201 Created
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                400NotCompletedYet:
+                  value:
+                    detail: Only completed appointments can be rated.
+                    errors: null
+                  summary: 400 Not completed yet
           description: ''
   /api/v1/appointments/{id}/reschedule/:
     patch:
@@ -1691,6 +2148,15 @@ paths:
                     reason: Routine 20-week checkup
                     doctor_notes: ''
                     cancellation_reason: ''
+                    payment:
+                      doctor_fee: '2000.00'
+                      commission_percentage: '20.00'
+                      commission_amount: '400.00'
+                      total_amount: '2400.00'
+                      status: pending
+                      patient_marked_paid_at: null
+                      confirmed_at: null
+                      payment_reference: ''
                     created_at: '2026-07-29T14:00:00Z'
                     updated_at: '2026-07-29T14:00:00Z'
                   summary: 200 OK
@@ -1714,7 +2180,10 @@ paths:
         400: `pending → confirmed | cancelled`, `confirmed → completed | cancelled
         | no_show`. `completed`/`cancelled`/`no_show` are terminal (no further transitions).
         `cancellation_reason` is only used/stored when `status=cancelled`. Notifies
-        whichever party didn''t make the change (or both, if an admin made it).'
+        whichever party didn''t make the change (or both, if an admin made it). **If
+        this appointment has a `payment` that isn''t yet `confirmed`, `pending → confirmed`
+        is blocked (400)** — use `POST .../payment/confirm/` instead, which confirms
+        both the payment and the appointment together in one call.'
       summary: Change appointment status
       parameters:
       - in: path
@@ -1777,6 +2246,15 @@ paths:
                     reason: Routine 20-week checkup
                     doctor_notes: ''
                     cancellation_reason: ''
+                    payment:
+                      doctor_fee: '2000.00'
+                      commission_percentage: '20.00'
+                      commission_amount: '400.00'
+                      total_amount: '2400.00'
+                      status: pending
+                      patient_marked_paid_at: null
+                      confirmed_at: null
+                      payment_reference: ''
                     created_at: '2026-07-29T14:00:00Z'
                     updated_at: '2026-07-29T14:00:00Z'
                   summary: 200 OK
@@ -1971,51 +2449,6 @@ paths:
       responses:
         '204':
           description: No response body
-    patch:
-      operationId: health_blood_pressure_partial_update
-      description: |-
-        Scopes a viewset's queryset by the requesting user's role, for any model
-        with a FK to the patient (default field name "patient"):
-          - PATIENT: only their own records
-          - DOCTOR: only records of patients assigned to them (PatientDoctorAssignment)
-          - ADMIN: unrestricted by default, or narrowed to one patient via
-            `?patient_id=` (e.g. an admin dashboard viewing a single patient's
-            full record — without this, admin would see every patient's rows
-            mixed together with no way to filter to just one)
-      summary: Update a blood pressure reading
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this blood pressure reading.
-        required: true
-      tags:
-      - Health
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedBloodPressureReadingRequest'
-            examples:
-              Request:
-                value:
-                  notes: Slightly elevated, will recheck tomorrow
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedBloodPressureReadingRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedBloodPressureReadingRequest'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BloodPressureReading'
-          description: ''
     get:
       operationId: health_blood_pressure_retrieve
       description: |-
@@ -2095,6 +2528,51 @@ paths:
             schema:
               $ref: '#/components/schemas/BloodPressureReadingRequest'
         required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BloodPressureReading'
+          description: ''
+    patch:
+      operationId: health_blood_pressure_partial_update
+      description: |-
+        Scopes a viewset's queryset by the requesting user's role, for any model
+        with a FK to the patient (default field name "patient"):
+          - PATIENT: only their own records
+          - DOCTOR: only records of patients assigned to them (PatientDoctorAssignment)
+          - ADMIN: unrestricted by default, or narrowed to one patient via
+            `?patient_id=` (e.g. an admin dashboard viewing a single patient's
+            full record — without this, admin would see every patient's rows
+            mixed together with no way to filter to just one)
+      summary: Update a blood pressure reading
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this blood pressure reading.
+        required: true
+      tags:
+      - Health
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBloodPressureReadingRequest'
+            examples:
+              Request:
+                value:
+                  notes: Slightly elevated, will recheck tomorrow
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBloodPressureReadingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBloodPressureReadingRequest'
       security:
       - jwtAuth: []
       responses:
@@ -2243,51 +2721,6 @@ paths:
       responses:
         '204':
           description: No response body
-    patch:
-      operationId: health_blood_sugar_partial_update
-      description: |-
-        Scopes a viewset's queryset by the requesting user's role, for any model
-        with a FK to the patient (default field name "patient"):
-          - PATIENT: only their own records
-          - DOCTOR: only records of patients assigned to them (PatientDoctorAssignment)
-          - ADMIN: unrestricted by default, or narrowed to one patient via
-            `?patient_id=` (e.g. an admin dashboard viewing a single patient's
-            full record — without this, admin would see every patient's rows
-            mixed together with no way to filter to just one)
-      summary: Update a blood sugar reading
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this blood sugar reading.
-        required: true
-      tags:
-      - Health
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedBloodSugarReadingRequest'
-            examples:
-              Request:
-                value:
-                  notes: Tested after a large meal
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedBloodSugarReadingRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedBloodSugarReadingRequest'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BloodSugarReading'
-          description: ''
     get:
       operationId: health_blood_sugar_retrieve
       description: |-
@@ -2366,6 +2799,51 @@ paths:
             schema:
               $ref: '#/components/schemas/BloodSugarReadingRequest'
         required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BloodSugarReading'
+          description: ''
+    patch:
+      operationId: health_blood_sugar_partial_update
+      description: |-
+        Scopes a viewset's queryset by the requesting user's role, for any model
+        with a FK to the patient (default field name "patient"):
+          - PATIENT: only their own records
+          - DOCTOR: only records of patients assigned to them (PatientDoctorAssignment)
+          - ADMIN: unrestricted by default, or narrowed to one patient via
+            `?patient_id=` (e.g. an admin dashboard viewing a single patient's
+            full record — without this, admin would see every patient's rows
+            mixed together with no way to filter to just one)
+      summary: Update a blood sugar reading
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this blood sugar reading.
+        required: true
+      tags:
+      - Health
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBloodSugarReadingRequest'
+            examples:
+              Request:
+                value:
+                  notes: Tested after a large meal
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBloodSugarReadingRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBloodSugarReadingRequest'
       security:
       - jwtAuth: []
       responses:
@@ -2509,46 +2987,6 @@ paths:
       responses:
         '204':
           description: No response body
-    patch:
-      operationId: health_symptoms_partial_update
-      description: Same upsert-shaped body as create — usually unnecessary since POSTing
-        again for the same date already upserts (see above).
-      summary: Update a symptom log
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this symptom log.
-        required: true
-      tags:
-      - Health
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedSymptomLogRequest'
-            examples:
-              Request:
-                value:
-                  symptom_ids:
-                  - 1
-                  notes: Nausea improved by evening
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedSymptomLogRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedSymptomLogRequest'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SymptomLog'
-          description: ''
     get:
       operationId: health_symptoms_retrieve
       description: POST upserts by (patient, log_date) — one entry per day, see SymptomLogSerializer.create().
@@ -2614,6 +3052,46 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/SymptomLogRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SymptomLog'
+          description: ''
+    patch:
+      operationId: health_symptoms_partial_update
+      description: Same upsert-shaped body as create — usually unnecessary since POSTing
+        again for the same date already upserts (see above).
+      summary: Update a symptom log
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this symptom log.
+        required: true
+      tags:
+      - Health
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSymptomLogRequest'
+            examples:
+              Request:
+                value:
+                  symptom_ids:
+                  - 1
+                  notes: Nausea improved by evening
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSymptomLogRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSymptomLogRequest'
       security:
       - jwtAuth: []
       responses:
@@ -3283,51 +3761,6 @@ paths:
       responses:
         '204':
           description: No response body
-    patch:
-      operationId: health_surgical_procedures_partial_update
-      description: |-
-        Scopes a viewset's queryset by the requesting user's role, for any model
-        with a FK to the patient (default field name "patient"):
-          - PATIENT: only their own records
-          - DOCTOR: only records of patients assigned to them (PatientDoctorAssignment)
-          - ADMIN: unrestricted by default, or narrowed to one patient via
-            `?patient_id=` (e.g. an admin dashboard viewing a single patient's
-            full record — without this, admin would see every patient's rows
-            mixed together with no way to filter to just one)
-      summary: Update a surgical procedure record
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this surgical procedure record.
-        required: true
-      tags:
-      - Health
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedSurgicalProcedureRecordRequest'
-            examples:
-              Request:
-                value:
-                  notes: Follow-up scan showed full recovery
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedSurgicalProcedureRecordRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedSurgicalProcedureRecordRequest'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SurgicalProcedureRecord'
-          description: ''
     get:
       operationId: health_surgical_procedures_retrieve
       description: |-
@@ -3407,6 +3840,51 @@ paths:
             schema:
               $ref: '#/components/schemas/SurgicalProcedureRecordRequest'
         required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SurgicalProcedureRecord'
+          description: ''
+    patch:
+      operationId: health_surgical_procedures_partial_update
+      description: |-
+        Scopes a viewset's queryset by the requesting user's role, for any model
+        with a FK to the patient (default field name "patient"):
+          - PATIENT: only their own records
+          - DOCTOR: only records of patients assigned to them (PatientDoctorAssignment)
+          - ADMIN: unrestricted by default, or narrowed to one patient via
+            `?patient_id=` (e.g. an admin dashboard viewing a single patient's
+            full record — without this, admin would see every patient's rows
+            mixed together with no way to filter to just one)
+      summary: Update a surgical procedure record
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this surgical procedure record.
+        required: true
+      tags:
+      - Health
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSurgicalProcedureRecordRequest'
+            examples:
+              Request:
+                value:
+                  notes: Follow-up scan showed full recovery
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSurgicalProcedureRecordRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSurgicalProcedureRecordRequest'
       security:
       - jwtAuth: []
       responses:
@@ -3733,46 +4211,6 @@ paths:
       responses:
         '204':
           description: No response body
-    patch:
-      operationId: diet_plans_partial_update
-      description: '`meals`/`foods_to_avoid`, if included, fully replace the existing
-        set (delete + recreate) — not merged/diffed. Omit them to leave meals/foods
-        untouched while updating other fields.'
-      summary: Update a diet plan (doctor/admin only)
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this diet plan.
-        required: true
-      tags:
-      - Diet
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedDietPlanRequest'
-            examples:
-              Request—NotesOnly:
-                value:
-                  notes: Reduce salt intake — mild swelling noted.
-                summary: Request — notes only
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedDietPlanRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedDietPlanRequest'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DietPlan'
-          description: ''
     get:
       operationId: diet_plans_retrieve
       description: Doctor/admin authored; patient is read-only (never creates/edits
@@ -3852,6 +4290,46 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/DietPlanRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DietPlan'
+          description: ''
+    patch:
+      operationId: diet_plans_partial_update
+      description: '`meals`/`foods_to_avoid`, if included, fully replace the existing
+        set (delete + recreate) — not merged/diffed. Omit them to leave meals/foods
+        untouched while updating other fields.'
+      summary: Update a diet plan (doctor/admin only)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this diet plan.
+        required: true
+      tags:
+      - Diet
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedDietPlanRequest'
+            examples:
+              Request—NotesOnly:
+                value:
+                  notes: Reduce salt intake — mild swelling noted.
+                summary: Request — notes only
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedDietPlanRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedDietPlanRequest'
       security:
       - jwtAuth: []
       responses:
@@ -4018,44 +4496,6 @@ paths:
       responses:
         '204':
           description: No response body
-    patch:
-      operationId: medicines_reminders_partial_update
-      description: 'E.g. `{"is_active": false}` to stop reminders without deleting
-        history.'
-      summary: Update a medicine reminder
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        description: A unique integer value identifying this medicine reminder.
-        required: true
-      tags:
-      - Medicines
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedMedicineReminderRequest'
-            examples:
-              Request:
-                value:
-                  is_active: false
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedMedicineReminderRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedMedicineReminderRequest'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MedicineReminder'
-          description: ''
     get:
       operationId: medicines_reminders_retrieve
       description: |-
@@ -4140,6 +4580,44 @@ paths:
             schema:
               $ref: '#/components/schemas/MedicineReminderRequest'
         required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MedicineReminder'
+          description: ''
+    patch:
+      operationId: medicines_reminders_partial_update
+      description: 'E.g. `{"is_active": false}` to stop reminders without deleting
+        history.'
+      summary: Update a medicine reminder
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this medicine reminder.
+        required: true
+      tags:
+      - Medicines
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMedicineReminderRequest'
+            examples:
+              Request:
+                value:
+                  is_active: false
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMedicineReminderRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMedicineReminderRequest'
       security:
       - jwtAuth: []
       responses:
@@ -4477,6 +4955,27 @@ paths:
                 200OK:
                   value:
                     detail: 3 notification(s) marked as read.
+                  summary: 200 OK
+          description: ''
+  /api/v1/notifications/unread-count/:
+    get:
+      operationId: notifications_unread_count_retrieve
+      description: For a notification-bell badge — own inbox only.
+      summary: Unread notification count
+      tags:
+      - Notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnreadCount'
+              examples:
+                200OK:
+                  value:
+                    unread_count: 8
                   summary: 200 OK
           description: ''
   /api/v1/notifications/{id}/:
@@ -5075,6 +5574,72 @@ paths:
                       pending: 2
                   summary: 200 OK
           description: ''
+  /api/v1/reports/doctor-dashboard/:
+    get:
+      operationId: reports_doctor_dashboard_retrieve
+      description: One aggregate request for the doctor app's home/dashboard screen
+        — previously the Flutter doctor app had to compose this from separate patients/appointments/notifications
+        calls. `upcoming_appointments` is the next 5 (pending or confirmed, soonest
+        first). `average_rating`/`total_ratings` are this doctor's own (see `POST
+        /appointments/{id}/rate/`), independent of the platform-wide figure on admin
+        stats. `payments_awaiting_my_confirmation` is how many patients have clicked
+        "I've paid" for one of this doctor's consultations but this doctor (or admin)
+        hasn't verified receipt yet — see `POST /appointments/{id}/payment/confirm/`.
+      summary: Doctor dashboard (doctor only)
+      tags:
+      - Reports
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DoctorDashboard'
+              examples:
+                200OK:
+                  value:
+                    total_assigned_patients: 34
+                    today_appointments: 3
+                    pending_appointments: 2
+                    upcoming_appointments:
+                    - id: 15
+                      patient:
+                        id: 2
+                        email: sara.ahmed@example.com
+                        first_name: Sara
+                        last_name: Ahmed
+                      doctor:
+                        id: 4
+                        email: dr.ayesha@example.com
+                        first_name: Ayesha
+                        last_name: Malik
+                      appointment_type: in_person
+                      scheduled_at: '2026-08-10T10:30:00Z'
+                      duration_minutes: 30
+                      status: confirmed
+                      meeting_link: ''
+                      reason: Routine checkup
+                      doctor_notes: ''
+                      cancellation_reason: ''
+                      payment:
+                        doctor_fee: '2000.00'
+                        commission_percentage: '20.00'
+                        commission_amount: '400.00'
+                        total_amount: '2400.00'
+                        status: confirmed
+                        patient_marked_paid_at: '2026-08-09T09:00:00Z'
+                        confirmed_at: '2026-08-09T09:15:00Z'
+                        payment_reference: JazzCash TXN482913
+                      created_at: '2026-07-29T14:00:00Z'
+                      updated_at: '2026-07-29T14:00:00Z'
+                    completed_appointments_count: 128
+                    average_rating: 4.8
+                    total_ratings: 42
+                    unread_notifications_count: 3
+                    payments_awaiting_my_confirmation: 2
+                  summary: 200 OK
+          description: ''
   /api/v1/reports/admin/stats/:
     get:
       operationId: reports_admin_stats_retrieve
@@ -5085,8 +5650,34 @@ paths:
         = patients with a profile but no LMP date yet, e.g. not yet completed onboarding).
         `recent_activities` is a computed-on-read feed (not a stored log) of the most
         recent patient registrations, appointment bookings, and SOS triggers, newest
-        first.
+        first. `payments_pending`/`payments_awaiting_verification`/`payments_confirmed`
+        are the per-consultation payment queue (see `POST /appointments/{id}/payment/mark-paid/`
+        and `.../payment/confirm/`) — `payments_awaiting_verification` is how many
+        patients have claimed payment but no doctor/admin has verified receipt yet.
+        `active_users_last_30_days` is approximated from `last_login` recency — there's
+        no real-time online/presence tracking (no websocket/heartbeat), so this is
+        a proxy, not live status. `new_patients_growth_percent` compares this calendar
+        month's new patient registrations to last month's; `null` if last month had
+        zero (percentage change is undefined, not zero, in that case). `average_doctor_rating`/`total_doctor_ratings`
+        come from `POST /appointments/{id}/rate/`; `null`/`0` until at least one completed
+        appointment has been rated. `total_revenue_collected`/`revenue_this_month`
+        are the platform's actual commission earned — summed from `AppointmentPayment.commission_amount`
+        on confirmed payments only — `null` (not `0`) until at least one payment has
+        been confirmed. `range_stats` is `null` unless both `?date_from=` and `?date_to=`
+        (`YYYY-MM-DD`, inclusive) are supplied — an additive custom-range view alongside
+        the fixed today/week/month windows above, not a replacement for them.
       summary: System-wide statistics / dashboard (admin only)
+      parameters:
+      - in: query
+        name: date_from
+        schema:
+          type: string
+        description: YYYY-MM-DD, inclusive. Must be supplied together with date_to.
+      - in: query
+        name: date_to
+        schema:
+          type: string
+        description: YYYY-MM-DD, inclusive. Must be supplied together with date_from.
       tags:
       - Reports
       security:
@@ -5123,7 +5714,38 @@ paths:
                     - type: patient_registered
                       description: Sara Ahmed registered as a patient.
                       timestamp: '2026-01-15T10:30:00Z'
+                    payments_pending: 8
+                    payments_awaiting_verification: 3
+                    payments_confirmed: 121
+                    active_users_last_30_days: 87
+                    new_patients_growth_percent: 12.5
+                    average_doctor_rating: 4.8
+                    total_doctor_ratings: 63
+                    total_revenue_collected: '18000.00'
+                    revenue_this_month: '4500.00'
+                    range_stats: null
                   summary: 200 OK
+                200OK—With?dateFrom=&dateTo=:
+                  value:
+                    range_stats:
+                      date_from: '2026-08-01'
+                      date_to: '2026-08-06'
+                      appointments_in_range: 23
+                      new_patients_in_range: 9
+                      new_doctors_in_range: 1
+                  summary: 200 OK — with ?date_from=&date_to=
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                400MissingDateTo:
+                  value:
+                    detail: Both date_from and date_to are required together.
+                    errors: null
+                  summary: 400 Missing date_to
           description: ''
   /api/v1/reports/search/:
     get:
@@ -5428,15 +6050,57 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/RecentActivity'
+        payments_pending:
+          type: integer
+        payments_awaiting_verification:
+          type: integer
+        payments_confirmed:
+          type: integer
+        active_users_last_30_days:
+          type: integer
+        new_patients_growth_percent:
+          type: number
+          format: double
+          nullable: true
+        average_doctor_rating:
+          type: number
+          format: double
+          nullable: true
+        total_doctor_ratings:
+          type: integer
+        total_revenue_collected:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        revenue_this_month:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        range_stats:
+          allOf:
+          - $ref: '#/components/schemas/RangeStats'
+          nullable: true
       required:
       - active_sos_events
+      - active_users_last_30_days
       - appointments_this_month
+      - average_doctor_rating
+      - new_patients_growth_percent
       - new_patients_this_week
+      - payments_awaiting_verification
+      - payments_confirmed
+      - payments_pending
+      - range_stats
       - recent_activities
+      - revenue_this_month
       - today_appointments
       - total_appointments
+      - total_doctor_ratings
       - total_doctors
       - total_patients
+      - total_revenue_collected
       - trimester_distribution
     Appointment:
       type: object
@@ -5476,6 +6140,10 @@ components:
         cancellation_reason:
           type: string
           readOnly: true
+        payment:
+          allOf:
+          - $ref: '#/components/schemas/AppointmentPayment'
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -5491,9 +6159,74 @@ components:
       - id
       - meeting_link
       - patient
+      - payment
       - scheduled_at
       - status
       - updated_at
+    AppointmentPayment:
+      type: object
+      description: |-
+        Always read-only, everywhere it's used — doctor_fee/commission_amount/
+        total_amount are computed server-side (apps.appointments.services::
+        create_appointment_payment) at booking time and never accepted from a
+        request body, so a modified frontend request can't pay a lower amount.
+      properties:
+        doctor_fee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        commission_percentage:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          readOnly: true
+        commission_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        total_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/AppointmentPaymentStatusEnum'
+          readOnly: true
+        patient_marked_paid_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        confirmed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        payment_reference:
+          type: string
+          readOnly: true
+      required:
+      - commission_amount
+      - commission_percentage
+      - confirmed_at
+      - doctor_fee
+      - patient_marked_paid_at
+      - payment_reference
+      - status
+      - total_amount
+    AppointmentPaymentStatusEnum:
+      enum:
+      - pending
+      - awaiting_verification
+      - confirmed
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `awaiting_verification` - Awaiting verification
+        * `confirmed` - Confirmed
     AppointmentRequest:
       type: object
       properties:
@@ -5576,6 +6309,9 @@ components:
       required:
       - size_comparison
       - week
+    BlankEnum:
+      enum:
+      - ''
     BloodPressureReading:
       type: object
       description: |-
@@ -5837,6 +6573,47 @@ components:
         title:
           type: string
           maxLength: 150
+    CityEnum:
+      enum:
+      - karachi
+      - lahore
+      - islamabad
+      - rawalpindi
+      - faisalabad
+      - multan
+      - peshawar
+      - quetta
+      - hyderabad
+      - sialkot
+      - gujranwala
+      - sargodha
+      - bahawalpur
+      - sukkur
+      - other
+      type: string
+      description: |-
+        * `karachi` - Karachi
+        * `lahore` - Lahore
+        * `islamabad` - Islamabad
+        * `rawalpindi` - Rawalpindi
+        * `faisalabad` - Faisalabad
+        * `multan` - Multan
+        * `peshawar` - Peshawar
+        * `quetta` - Quetta
+        * `hyderabad` - Hyderabad
+        * `sialkot` - Sialkot
+        * `gujranwala` - Gujranwala
+        * `sargodha` - Sargodha
+        * `bahawalpur` - Bahawalpur
+        * `sukkur` - Sukkur
+        * `other` - Other
+    ConfirmPaymentRequest:
+      type: object
+      properties:
+        payment_reference:
+          type: string
+          default: ''
+          description: e.g. a JazzCash/EasyPaisa transaction ID.
     DetailResponse:
       type: object
       description: |-
@@ -5957,12 +6734,52 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/FoodAvoidanceItemRequest'
+    DoctorDashboard:
+      type: object
+      properties:
+        total_assigned_patients:
+          type: integer
+        today_appointments:
+          type: integer
+        pending_appointments:
+          type: integer
+        upcoming_appointments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Appointment'
+        completed_appointments_count:
+          type: integer
+        average_rating:
+          type: number
+          format: double
+          nullable: true
+        total_ratings:
+          type: integer
+        unread_notifications_count:
+          type: integer
+        payments_awaiting_my_confirmation:
+          type: integer
+      required:
+      - average_rating
+      - completed_appointments_count
+      - payments_awaiting_my_confirmation
+      - pending_appointments
+      - today_appointments
+      - total_assigned_patients
+      - total_ratings
+      - unread_notifications_count
+      - upcoming_appointments
     DoctorInviteAcceptRequest:
       type: object
       properties:
-        token:
+        email:
           type: string
+          format: email
           minLength: 1
+        otp_code:
+          type: string
+          minLength: 6
+          maxLength: 6
         password:
           type: string
           writeOnly: true
@@ -5977,8 +6794,9 @@ components:
           type: string
           default: ''
       required:
+      - email
+      - otp_code
       - password
-      - token
     DoctorInviteRequest:
       type: object
       properties:
@@ -6022,10 +6840,30 @@ components:
           allOf:
           - $ref: '#/components/schemas/DoctorProfile'
           readOnly: true
+        distance_km:
+          type: number
+          format: double
+          nullable: true
+          readOnly: true
+        average_rating:
+          type: number
+          format: double
+          nullable: true
+          readOnly: true
+        total_ratings:
+          type: integer
+          readOnly: true
+        completed_appointments_count:
+          type: integer
+          readOnly: true
       required:
+      - average_rating
+      - completed_appointments_count
+      - distance_km
       - doctor_profile
       - email
       - id
+      - total_ratings
     DoctorMessageRequest:
       type: object
       properties:
@@ -6060,6 +6898,28 @@ components:
           type: string
         is_accepting_patients:
           type: boolean
+        city:
+          oneOf:
+          - $ref: '#/components/schemas/CityEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        area:
+          type: string
+          maxLength: 100
+        latitude:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        longitude:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        consultation_fee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
     DoctorProfileRequest:
       type: object
       properties:
@@ -6078,6 +6938,59 @@ components:
           type: string
         is_accepting_patients:
           type: boolean
+        city:
+          oneOf:
+          - $ref: '#/components/schemas/CityEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        area:
+          type: string
+          maxLength: 100
+        latitude:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        longitude:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        consultation_fee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+    DoctorRating:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        score:
+          type: integer
+          maximum: 5
+          minimum: 1
+        comment:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - score
+    DoctorRatingRequest:
+      type: object
+      properties:
+        score:
+          type: integer
+          maximum: 5
+          minimum: 1
+        comment:
+          type: string
+      required:
+      - score
     DoctorUpdate:
       type: object
       properties:
@@ -6371,6 +7284,20 @@ components:
       required:
       - email
       - password
+    MarkPatientPaidRequest:
+      type: object
+      properties:
+        payment_reference:
+          type: string
+          default: ''
+          description: e.g. a JazzCash/EasyPaisa transaction ID.
+        amount_paid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+          description: The amount actually confirmed received, if known — feeds admin
+            revenue stats.
     Me:
       type: object
       properties:
@@ -6599,6 +7526,54 @@ components:
           type: boolean
       required:
       - medicine_name
+    MySubscriptionResponse:
+      type: object
+      description: Schema-only — adds payment_methods to PatientSubscriptionSerializer's
+        fields for MySubscriptionView's response shape.
+      properties:
+        trial_ends_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        is_paid:
+          type: boolean
+          readOnly: true
+        paid_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        payment_reference:
+          type: string
+          readOnly: true
+          description: Admin's free-text note, e.g. a JazzCash transaction ID.
+        amount_paid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+        is_active:
+          type: boolean
+          readOnly: true
+        days_remaining:
+          type: integer
+          nullable: true
+          readOnly: true
+        payment_methods:
+          allOf:
+          - $ref: '#/components/schemas/PlatformPaymentMethod'
+          readOnly: true
+      required:
+      - amount_paid
+      - days_remaining
+      - is_active
+      - is_paid
+      - paid_at
+      - payment_methods
+      - payment_reference
+      - trial_ends_at
     Notification:
       type: object
       properties:
@@ -7278,6 +8253,28 @@ components:
           type: string
         is_accepting_patients:
           type: boolean
+        city:
+          oneOf:
+          - $ref: '#/components/schemas/CityEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        area:
+          type: string
+          maxLength: 100
+        latitude:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        longitude:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        consultation_fee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
     PatchedDoctorUpdateRequest:
       type: object
       properties:
@@ -7392,6 +8389,46 @@ components:
           maxLength: 20
         patient_profile:
           $ref: '#/components/schemas/PatientProfileRequest'
+    PatchedPlatformPaymentMethodRequest:
+      type: object
+      properties:
+        jazzcash_number:
+          type: string
+          maxLength: 20
+        jazzcash_account_title:
+          type: string
+          maxLength: 150
+        easypaisa_number:
+          type: string
+          maxLength: 20
+        easypaisa_account_title:
+          type: string
+          maxLength: 150
+        bank_name:
+          type: string
+          maxLength: 150
+        bank_account_title:
+          type: string
+          maxLength: 150
+        bank_account_number:
+          type: string
+          maxLength: 50
+        bank_iban:
+          type: string
+          maxLength: 50
+        subscription_price_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+        subscription_price_currency:
+          type: string
+          minLength: 1
+          maxLength: 3
+        commission_percentage:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
     PatchedSurgicalProcedureRecordRequest:
       type: object
       description: |-
@@ -7475,10 +8512,15 @@ components:
           allOf:
           - $ref: '#/components/schemas/PatientProfile'
           readOnly: true
+        subscription:
+          allOf:
+          - $ref: '#/components/schemas/PatientSubscription'
+          readOnly: true
       required:
       - email
       - id
       - patient_profile
+      - subscription
     PatientProfile:
       type: object
       properties:
@@ -7540,6 +8582,53 @@ components:
           maxLength: 20
         address:
           type: string
+    PatientSubscription:
+      type: object
+      description: |-
+        Read-only everywhere it's used — is_paid/paid_at/etc. are only ever
+        written server-side (accounts.services.mark_patient_paid), never
+        accepted directly from a request body, so this never appears as a
+        writable nested field on a patient-editable serializer (that would let
+        a patient grant themselves free access via their own profile PATCH).
+      properties:
+        trial_ends_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        is_paid:
+          type: boolean
+          readOnly: true
+        paid_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        payment_reference:
+          type: string
+          readOnly: true
+          description: Admin's free-text note, e.g. a JazzCash transaction ID.
+        amount_paid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+        is_active:
+          type: boolean
+          readOnly: true
+        days_remaining:
+          type: integer
+          nullable: true
+          readOnly: true
+      required:
+      - amount_paid
+      - days_remaining
+      - is_active
+      - is_paid
+      - paid_at
+      - payment_reference
+      - trial_ends_at
     PatientSummaryReport:
       type: object
       properties:
@@ -7596,6 +8685,51 @@ components:
           maxLength: 20
         patient_profile:
           $ref: '#/components/schemas/PatientProfile'
+    PlatformPaymentMethod:
+      type: object
+      properties:
+        jazzcash_number:
+          type: string
+          maxLength: 20
+        jazzcash_account_title:
+          type: string
+          maxLength: 150
+        easypaisa_number:
+          type: string
+          maxLength: 20
+        easypaisa_account_title:
+          type: string
+          maxLength: 150
+        bank_name:
+          type: string
+          maxLength: 150
+        bank_account_title:
+          type: string
+          maxLength: 150
+        bank_account_number:
+          type: string
+          maxLength: 50
+        bank_iban:
+          type: string
+          maxLength: 50
+        subscription_price_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+        subscription_price_currency:
+          type: string
+          maxLength: 3
+        commission_percentage:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - updated_at
     PregnancyProgress:
       type: object
       properties:
@@ -7624,6 +8758,27 @@ components:
       - lmp_date
       - percent_complete
       - trimester
+    RangeStats:
+      type: object
+      properties:
+        date_from:
+          type: string
+          format: date
+        date_to:
+          type: string
+          format: date
+        appointments_in_range:
+          type: integer
+        new_patients_in_range:
+          type: integer
+        new_doctors_in_range:
+          type: integer
+      required:
+      - appointments_in_range
+      - date_from
+      - date_to
+      - new_doctors_in_range
+      - new_patients_in_range
     ReadingContextEnum:
       enum:
       - fasting
@@ -7948,14 +9103,27 @@ components:
         * `patient_registered` - patient_registered
         * `appointment_booked` - appointment_booked
         * `sos_triggered` - sos_triggered
+    UnreadCount:
+      type: object
+      properties:
+        unread_count:
+          type: integer
+      required:
+      - unread_count
     VerifyEmailRequest:
       type: object
       properties:
-        token:
+        email:
           type: string
+          format: email
           minLength: 1
+        otp_code:
+          type: string
+          minLength: 6
+          maxLength: 6
       required:
-      - token
+      - email
+      - otp_code
     WaterIntakeEntry:
       type: object
       description: |-

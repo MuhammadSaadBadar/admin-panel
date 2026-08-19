@@ -1,3 +1,5 @@
+import 'package:admin/core/routes/route_names.dart';
+import 'package:admin/core/widgets/app_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -5,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/color_constants.dart';
 import '../../../core/widgets/custom_appbar.dart';
 import '../controllers/change_password_controller.dart';
+import '../../../core/widgets/dashboard_background.dart';
 
 /// Change Password screen — calls `POST /auth/password/change/`.
 ///
@@ -142,34 +145,188 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final ColorScheme colorScheme = Theme.of(context).colorScheme;
+    final bool isMobile = MediaQuery.of(context).size.width < 768;
 
     return Scaffold(
       backgroundColor: ColorConstants.background,
-      appBar: CustomAppBar(title: 'Change Password', showBackButton: true),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 540),
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: ColorConstants.cardBackground,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.1)),
+      // Shared navigation drawer on mobile (hamburger + swipe-to-open).
+      drawer: isMobile
+          ? AppDrawer(
+              currentRoute: RouteNames.profile,
+              onNavigate: (route) {
+                Navigator.of(context).pop(); // close drawer
+                if (route != RouteNames.profile) {
+                  Get.toNamed(route);
+                }
+              },
+            )
+          : null,
+      body: DashboardBackground(
+        child: SafeArea(
+          child: Row(
+            children: [
+              if (!isMobile) _buildSidebar(colorScheme),
+              Expanded(
+                child: Column(
+                  children: [
+                    CustomAppBar(
+                      title: 'Change Password',
+                      showBackButton: isMobile,
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(24),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 540),
+                            child: Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: ColorConstants.cardBackground,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.1),
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildHeader(colorScheme),
+                                  const SizedBox(height: 20),
+                                  _buildForm(colorScheme),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(colorScheme),
-                  const SizedBox(height: 20),
-                  _buildForm(colorScheme),
-                ],
-              ),
-            ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+
+  // ── Desktop sidebar ────────────────────────────────────────────────────
+  Widget _buildSidebar(ColorScheme colorScheme) {
+    final List<Map<String, dynamic>> navItems = [
+      {
+        'icon': Icons.dashboard,
+        'label': 'Dashboard',
+        'route': RouteNames.dashboard,
+      },
+      {
+        'icon': Icons.medical_services,
+        'label': 'Doctor Management',
+        'route': RouteNames.doctors,
+      },
+      {
+        'icon': Icons.person,
+        'label': 'Patient Management',
+        'route': RouteNames.patients,
+      },
+      {
+        'icon': Icons.event,
+        'label': 'Appointments',
+        'route': RouteNames.appointments,
+      },
+      {
+        'icon': Icons.settings,
+        'label': 'Settings',
+        'route': RouteNames.settings,
+      },
+    ];
+
+    return Container(
+      width: 280,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        border: Border(right: BorderSide(color: Colors.white.withOpacity(0.1))),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 24),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Mama Health',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'ADMIN CONSOLE',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.05,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              itemCount: navItems.length,
+              itemBuilder: (context, index) {
+                final item = navItems[index];
+                final isSelected = item['route'] == RouteNames.profile;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: isSelected
+                          ? colorScheme.secondaryContainer
+                          : Colors.transparent,
+                    ),
+                    child: ListTile(
+                      leading: Icon(
+                        item['icon'] as IconData,
+                        color: isSelected
+                            ? colorScheme.onSecondaryContainer
+                            : colorScheme.onSurfaceVariant,
+                        size: 24,
+                      ),
+                      title: Text(
+                        item['label'] as String,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14,
+                          fontWeight: isSelected
+                              ? FontWeight.w700
+                              : FontWeight.w400,
+                          color: isSelected
+                              ? colorScheme.onSecondaryContainer
+                              : colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      onTap: () {
+                        final route = item['route'] as String;
+                        if (route != RouteNames.profile) {
+                          Get.toNamed(route);
+                        }
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

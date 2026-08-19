@@ -108,11 +108,23 @@ class ProfileRepository {
   /// Requires the current password plus the new one. The backend validates
   /// both (wrong old password returns a `400` with `old_password` field
   /// errors) — those are surfaced to the UI via [ApiException.fieldErrors].
+  ///
+  /// **Network-error retry:** On Render's free tier the backend may commit the
+  /// password change and then drop / time out the response (cold start). When
+  /// the first attempt fails at the *network* layer we retry once with short
+  /// timeouts and treat these outcomes as success because they *prove* the
+  /// change already happened server-side:
+  ///   - a 2xx retry → the change succeeded;
+  ///   - a 401/403 retry → the session was invalidated by the password change;
+  ///   - a 400 with an `old_password` error → the old password no longer
+  ///     matches, i.e. the change was already committed.
   Future<void> changePassword({
     required String oldPassword,
     required String newPassword,
   }) async {
     final path = ApiConstants.authPasswordChange;
+    final body = {'old_password': oldPassword, 'new_password': newPassword};
+
     // Password values are intentionally NOT logged (sensitive).
     debugPrint(
       '[ProfileRepo] changePassword called — path=$path '
@@ -121,16 +133,7 @@ class ProfileRepository {
     );
 
     try {
-      final response = await _apiClient.post(
-        path,
-        data: {'old_password': oldPassword, 'new_password': newPassword},
-      );
-      debugPrint(
-        '[ProfileRepo] changePassword response — status=${response.statusCode}',
-      );
-      debugPrint(
-        '[ProfileRepo] changePassword response body=${_sanitizeResponse(response.data)}',
-      );
+      await _postChangePassword(path, body);
     } on DioException catch (e) {
       debugPrint(
         '[ProfileRepo] changePassword DioException — type=${e.type} '
@@ -141,9 +144,132 @@ class ProfileRepository {
         e,
         defaultMessage: 'Unable to change your password.',
       );
-      debugPrint('[ProfileRepo] changePassword error — $mapped');
-      throw mapped;
+
+      // Only retry when the failure is at the network layer (connection
+      // drop / timeout) — the password may already have been changed.
+      if (mapped is! NetworkException) {
+        debugPrint(
+          '[ProfileRepo] changePassword — non-network error, surfacing: $mapped',
+        );
+        throw mapped;
+      }
+
+      debugPrint(
+        '[ProfileRepo] changePassword network failure detected — retrying '
+        'once to confirm whether the password was changed server-side.',
+      );
+      try {
+        await _postChangePassword(
+          path,
+          body,
+          connectTimeout: const Duration(seconds: 15),
+          receiveTimeout: const Duration(seconds: 25),
+        );
+        debugPrint(
+          '[ProfileRepo] changePassword retry returned 2xx — treating as '
+          'success.',
+        );
+        return;
+      } on DioException catch (retryError) {
+        debugPrint(
+          '[ProfileRepo] changePassword retry DioException — '
+          'type=${retryError.type} '
+          'status=${retryError.response?.statusCode} '
+          'message=${retryError.message}',
+        );
+        debugPrint(
+          '[ProfileRepo] changePassword retry error '
+          'body=${retryError.response?.data}',
+        );
+
+        final retryResponse = retryError.response;
+        final retryStatus = retryError.response?.statusCode;
+
+        // The session was invalidated by the password change → success.
+        if (retryStatus == 401 || retryStatus == 403) {
+          debugPrint(
+            '[ProfileRepo] changePassword retry returned $retryStatus — '
+            'session invalidated, password was changed. Treating as success.',
+          );
+          return;
+        }
+
+        // The old password no longer matches → the change was committed.
+        if (retryStatus == 400 && _hasOldPasswordError(retryResponse)) {
+          debugPrint(
+            '[ProfileRepo] changePassword retry returned 400 with '
+            'old_password error — the change was already committed. '
+            'Treating as success.',
+          );
+          return;
+        }
+
+        // A definitive non-network HTTP error → surface the retry's error as
+        // it is more accurate than the original network error.
+        if (retryResponse != null) {
+          final retryMapped = ApiErrorMapper.mapDioException(
+            retryError,
+            defaultMessage: 'Unable to change your password.',
+          );
+          debugPrint(
+            '[ProfileRepo] changePassword retry produced a definitive error '
+            '— surfacing: $retryMapped',
+          );
+          throw retryMapped;
+        }
+
+        // The retry also failed at the network layer — rethrow the original
+        // network error.
+        debugPrint(
+          '[ProfileRepo] changePassword retry also failed at network layer — '
+          'rethrowing original network error.',
+        );
+        throw mapped;
+      }
     }
+  }
+
+  /// Sends the password-change request and logs the response.
+  Future<void> _postChangePassword(
+    String path,
+    Map<String, dynamic> body, {
+    Duration? connectTimeout,
+    Duration? receiveTimeout,
+  }) async {
+    final response = await _apiClient.post(
+      path,
+      data: body,
+      connectTimeout: connectTimeout,
+      receiveTimeout: receiveTimeout,
+    );
+    debugPrint(
+      '[ProfileRepo] changePassword response — status=${response.statusCode}',
+    );
+    debugPrint(
+      '[ProfileRepo] changePassword response '
+      'body=${_sanitizeResponse(response.data)}',
+    );
+  }
+
+  /// Returns true when a 400 response body carries a structured
+  /// `old_password` field error, which proves the old password no longer
+  /// matches (i.e. the password was already changed).
+  bool _hasOldPasswordError(Response? response) {
+    if (response?.data is! Map<String, dynamic>) return false;
+    final data = response!.data as Map<String, dynamic>;
+
+    // DRF `errors` envelope: {"errors": {"old_password": ["..."]}}
+    final errors = data['errors'];
+    if (errors is Map && errors.containsKey('old_password')) {
+      return true;
+    }
+
+    // Flat shape: {"old_password": ["..."]}
+    if (data.containsKey('old_password')) return true;
+
+    // Non-field detail may mention the old password.
+    final detail = data['detail'];
+    return detail is String && detail.toLowerCase().contains('old_password');
   }
 
   // ── Logging helpers ────────────────────────────────────────────────────

@@ -62,6 +62,52 @@ class Doctor {
     return '$yearsOfExperience Years Experience';
   }
 
+  /// Returns a copy of this [Doctor] with the given fields replaced.
+  ///
+  /// Used to rebuild a doctor from a partial PATCH response while preserving
+  /// the original ID (and any other fields the backend did not include).
+  Doctor copyWith({
+    int? id,
+    String? firstName,
+    String? lastName,
+    String? email,
+    String? phoneNumber,
+    bool? isActive,
+    DateTime? dateJoined,
+    String? specialization,
+    String? licenseNumber,
+    int? yearsOfExperience,
+    String? bio,
+    bool? isAcceptingPatients,
+    String? profileImage,
+    String? city,
+    double? rating,
+    int? reviews,
+    bool? isAssigned,
+    bool? isPending,
+  }) {
+    return Doctor(
+      id: id ?? this.id,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      email: email ?? this.email,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      isActive: isActive ?? this.isActive,
+      dateJoined: dateJoined ?? this.dateJoined,
+      specialization: specialization ?? this.specialization,
+      licenseNumber: licenseNumber ?? this.licenseNumber,
+      yearsOfExperience: yearsOfExperience ?? this.yearsOfExperience,
+      bio: bio ?? this.bio,
+      isAcceptingPatients: isAcceptingPatients ?? this.isAcceptingPatients,
+      profileImage: profileImage ?? this.profileImage,
+      city: city ?? this.city,
+      rating: rating ?? this.rating,
+      reviews: reviews ?? this.reviews,
+      isAssigned: isAssigned ?? this.isAssigned,
+      isPending: isPending ?? this.isPending,
+    );
+  }
+
   factory Doctor.fromJson(Map<String, dynamic> json) {
     // Parse nested doctor_profile if present.
     final profile = json['doctor_profile'] is Map

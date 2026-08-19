@@ -1,6 +1,7 @@
 import 'package:admin/core/constants/api_constants.dart';
 import 'package:admin/core/network/api_client.dart';
 import 'package:admin/features/appointments/models/appointment.dart';
+import 'package:admin/features/appointments/models/payment_methods.dart';
 import 'package:flutter/foundation.dart';
 
 /// Repository for the Appointments API. All endpoints come from
@@ -152,5 +153,83 @@ class AppointmentRepository {
       'notes="${parsed.doctorNotes}"',
     );
     return parsed;
+  }
+
+  /// Patient marks this appointment's consultation fee as paid.
+  ///
+  /// `POST /appointments/{id}/payment/mark-paid/` — patient-only, step 1 of 2
+  /// in the manual payment flow. Does NOT confirm the appointment; that only
+  /// happens once a doctor/admin verifies via [verifyPayment].
+  Future<Appointment> markPaid(int id) async {
+    final path =
+        '${ApiConstants.appointmentsDetail}/$id${ApiConstants.appointmentPaymentMarkPaidSuffix}';
+    debugPrint('[AppointmentRepo] markPaid called — id=$id path=$path');
+    final response = await _apiClient.post(path, data: {});
+    debugPrint(
+      '[AppointmentRepo] markPaid response — status=${response.statusCode} '
+      'body=${response.data}',
+    );
+    final parsed = Appointment.fromJson(response.data);
+    debugPrint(
+      '[AppointmentRepo] markPaid parsed — id=${parsed.id} '
+      'paymentState=${parsed.payment?.status.displayLabel}',
+    );
+    return parsed;
+  }
+
+  /// Doctor/admin verifies the patient's claimed payment was received.
+  ///
+  /// `POST /appointments/{id}/payment/confirm/` — step 2 of 2. This also
+  /// confirms the appointment itself in the same call.
+  Future<Appointment> verifyPayment(int id, {String? paymentReference}) async {
+    final path =
+        '${ApiConstants.appointmentsDetail}/$id${ApiConstants.appointmentPaymentConfirmSuffix}';
+    final body = {
+      if (paymentReference != null && paymentReference.trim().isNotEmpty)
+        'payment_reference': paymentReference.trim(),
+    };
+    debugPrint(
+      '[AppointmentRepo] verifyPayment called — id=$id body=$body path=$path',
+    );
+    final response = await _apiClient.post(path, data: body);
+    debugPrint(
+      '[AppointmentRepo] verifyPayment response — status=${response.statusCode} '
+      'body=${response.data}',
+    );
+    final parsed = Appointment.fromJson(response.data);
+    debugPrint(
+      '[AppointmentRepo] verifyPayment parsed — id=${parsed.id} '
+      'paymentState=${parsed.payment?.status.displayLabel} '
+      'apptStatus=${parsed.status.displayLabel}',
+    );
+    return parsed;
+  }
+
+  /// Fetches the platform's configured payment methods.
+  ///
+  /// `GET /accounts/payment-methods/` — accessible to any authenticated user.
+  /// The admin configures JazzCash / EasyPaisa / bank details and the price
+  /// shown to patients via `PATCH /accounts/payment-methods/`. The returned
+  /// details are rendered as-is (never hardcoded).
+  Future<PlatformPaymentMethods> getPaymentMethods() async {
+    final path = ApiConstants.accountsPaymentMethods;
+    debugPrint('[AppointmentRepo] getPaymentMethods called — path=$path');
+    try {
+      final response = await _apiClient.get(path);
+      debugPrint(
+        '[AppointmentRepo] getPaymentMethods response — '
+        'status=${response.statusCode} body=${response.data}',
+      );
+      final parsed = PlatformPaymentMethods.fromJson(response.data);
+      debugPrint(
+        '[AppointmentRepo] getPaymentMethods parsed — '
+        'jazzcash=${parsed.hasJazzcash} easypaisa=${parsed.hasEasypaisa} '
+        'bank=${parsed.hasBank} price=${parsed.subscriptionPriceAmount}',
+      );
+      return parsed;
+    } catch (e) {
+      debugPrint('[AppointmentRepo] getPaymentMethods — ERROR: $e');
+      rethrow;
+    }
   }
 }

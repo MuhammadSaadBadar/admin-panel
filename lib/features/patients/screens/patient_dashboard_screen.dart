@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/color_constants.dart';
 import '../../../core/routes/route_names.dart';
 import '../../../core/widgets/custom_appbar.dart';
+import '../../../core/widgets/dashboard_background.dart';
+import '../../notifications/widgets/notification_bell.dart';
 import '../controllers/patient_list_controller.dart';
 import '../models/patient.dart';
 import '../repositories/patient_repository.dart';
@@ -78,49 +80,51 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
               },
             )
           : null,
-      body: Row(
-        children: [
-          // Desktop Sidebar
-          if (!isMobile) _buildSidebar(),
-          // Main Content
-          Expanded(
-            child: Column(
-              children: [
-                _buildTopAppBar(isMobile),
-                Expanded(
-                  child: SingleChildScrollView(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(24),
-                    child: FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: Column(
-                        children: [
-                          _buildFiltersSection(),
-                          const SizedBox(height: 24),
-                          _buildPatientGrid(),
-                          const SizedBox(height: 24),
-                          Obx(() {
-                            if (_controller.isLoadingMore.value) {
-                              return Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Center(
-                                  child: CircularProgressIndicator(
-                                    color: ColorConstants.primary,
+      body: DashboardBackground(
+        child: Row(
+          children: [
+            // Desktop Sidebar
+            if (!isMobile) _buildSidebar(),
+            // Main Content
+            Expanded(
+              child: Column(
+                children: [
+                  _buildTopAppBar(isMobile),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(24),
+                      child: FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: Column(
+                          children: [
+                            _buildFiltersSection(),
+                            const SizedBox(height: 24),
+                            _buildPatientGrid(),
+                            const SizedBox(height: 24),
+                            Obx(() {
+                              if (_controller.isLoadingMore.value) {
+                                return Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      color: ColorConstants.primary,
+                                    ),
                                   ),
-                                ),
-                              );
-                            }
-                            return const SizedBox.shrink();
-                          }),
-                        ],
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            }),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       floatingActionButton: isMobile
           ? FloatingActionButton(
@@ -310,7 +314,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
   Widget _buildTopAppBar(bool isMobile) {
     return CustomAppBar(
       title: 'Patient Management',
-      showMenuButton: isMobile,
+      showBackButton: isMobile,
       actions: [
         if (!isMobile)
           Container(
@@ -352,47 +356,26 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
             ),
           ),
         const SizedBox(width: 16),
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: ColorConstants.surfaceContainerHigh,
-            shape: BoxShape.circle,
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Icon(
-                Icons.notifications,
-                color: ColorConstants.primary,
-                size: 24,
-              ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: ColorConstants.primary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        const NotificationBell(),
       ],
     );
   }
 
   Widget _buildFiltersSection() {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: ColorConstants.cardBackground.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ColorConstants.borderWhite10),
+        color: ColorConstants.dashboardPanel,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ColorConstants.dashboardLine, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: ColorConstants.dashboardShadow,
+            blurRadius: 12,
+            spreadRadius: 2,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -403,39 +386,10 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Expanded(flex: 2, child: _buildSearchField()),
-                    const SizedBox(width: 18),
-                    Expanded(
-                      flex: 1,
-                      child: Obx(
-                        () => _buildFilterDropdown(
-                          'Trimester',
-                          const [
-                            'All Trimesters',
-                            '1st Trimester',
-                            '2nd Trimester',
-                            '3rd Trimester',
-                          ],
-                          selectedValue: _trimesterLabel,
-                          onChanged: _onTrimesterChanged,
-                        ),
-                      ),
-                    ),
+                    Expanded(flex: 3, child: _buildSearchField()),
                     const SizedBox(width: 16),
                     Expanded(
-                      flex: 1,
-                      child: Obx(
-                        () => _buildFilterDropdown(
-                          'Risk Level',
-                          const ['Any Risk', 'High Risk', 'Normal'],
-                          selectedValue: _riskLevelLabel,
-                          onChanged: _onRiskLevelChanged,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 13),
-                    Expanded(
-                      flex: 1,
+                      flex: 2,
                       child: Obx(
                         () => _buildFilterDropdown(
                           'Doctor',
@@ -449,31 +403,47 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                       ),
                     ),
                     const SizedBox(width: 16),
-                    ElevatedButton.icon(
-                      onPressed: _controller.hasActiveFilters
-                          ? () => _controller.clearFilters()
-                          : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ColorConstants.surfaceContainerHigh,
-                        foregroundColor: ColorConstants.primary,
-                        disabledBackgroundColor:
-                            ColorConstants.surfaceContainer,
-                        disabledForegroundColor: ColorConstants.onSurfaceVariant
-                            .withOpacity(0.4),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 14,
+                    SizedBox(
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: _controller.hasActiveFilters
+                            ? () => _controller.clearFilters()
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: ColorConstants.dashboardPink,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: ColorConstants
+                              .dashboardInkSoft
+                              .withOpacity(0.2),
+                          disabledForegroundColor: ColorConstants
+                              .dashboardInkSoft
+                              .withOpacity(0.4),
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 0,
                         ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                        icon: Icon(
+                          Icons.filter_alt_off,
+                          size: 20,
+                          color: _controller.hasActiveFilters
+                              ? Colors.white
+                              : ColorConstants.dashboardInkSoft.withOpacity(
+                                  0.4,
+                                ),
                         ),
-                      ),
-                      icon: const Icon(Icons.filter_alt_off, size: 20),
-                      label: Text(
-                        'Clear Filters',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
+                        label: Text(
+                          'Clear Filters',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: _controller.hasActiveFilters
+                                ? Colors.white
+                                : ColorConstants.dashboardInkSoft.withOpacity(
+                                    0.4,
+                                  ),
+                          ),
                         ),
                       ),
                     ),
@@ -484,37 +454,6 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                   children: [
                     _buildSearchField(),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Obx(
-                            () => _buildFilterDropdown(
-                              'Trimester',
-                              const [
-                                'All Trimesters',
-                                '1st Trimester',
-                                '2nd Trimester',
-                                '3rd Trimester',
-                              ],
-                              selectedValue: _trimesterLabel,
-                              onChanged: _onTrimesterChanged,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Obx(
-                            () => _buildFilterDropdown(
-                              'Risk Level',
-                              const ['Any Risk', 'High Risk', 'Normal'],
-                              selectedValue: _riskLevelLabel,
-                              onChanged: _onRiskLevelChanged,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
@@ -531,31 +470,47 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Expanded(
+                        SizedBox(
+                          height: 48,
                           child: ElevatedButton.icon(
                             onPressed: _controller.hasActiveFilters
                                 ? () => _controller.clearFilters()
                                 : null,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  ColorConstants.surfaceContainerHigh,
-                              foregroundColor: ColorConstants.primary,
-                              disabledBackgroundColor:
-                                  ColorConstants.surfaceContainer,
+                              backgroundColor: ColorConstants.dashboardPink,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: ColorConstants
+                                  .dashboardInkSoft
+                                  .withOpacity(0.2),
                               disabledForegroundColor: ColorConstants
-                                  .onSurfaceVariant
+                                  .dashboardInkSoft
                                   .withOpacity(0.4),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
                               ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              elevation: 0,
                             ),
-                            icon: const Icon(Icons.filter_alt_off, size: 20),
+                            icon: Icon(
+                              Icons.filter_alt_off,
+                              size: 20,
+                              color: _controller.hasActiveFilters
+                                  ? Colors.white
+                                  : ColorConstants.dashboardInkSoft.withOpacity(
+                                      0.4,
+                                    ),
+                            ),
                             label: Text(
                               'Clear',
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
+                                color: _controller.hasActiveFilters
+                                    ? Colors.white
+                                    : ColorConstants.dashboardInkSoft
+                                          .withOpacity(0.4),
                               ),
                             ),
                           ),
@@ -564,7 +519,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                     ),
                   ],
                 ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               // Active-filter summary + result count (reactive)
               Obx(() {
                 final total = _controller.filteredPatients.length;
@@ -577,8 +532,9 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                     child: Text(
                       'Showing all patients',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        color: ColorConstants.onSurfaceVariant,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: ColorConstants.dashboardInkSoft,
                       ),
                     ),
                   );
@@ -586,12 +542,6 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
 
                 final List<String> parts = [];
                 if (search.isNotEmpty) parts.add('Search: "$search"');
-                if (_controller.selectedTrimester.value != null) {
-                  parts.add('Trimester ${_controller.selectedTrimester.value}');
-                }
-                if (_controller.selectedRiskLevel.value.isNotEmpty) {
-                  parts.add('Risk: ${_controller.selectedRiskLevel.value}');
-                }
                 if (_controller.selectedDoctorId.value != null) {
                   final doc = _controller.doctors
                       .where((d) => d.id == _controller.selectedDoctorId.value)
@@ -599,29 +549,64 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                   parts.add('Doctor: ${doc?.name ?? "Selected"}');
                 }
 
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Filters: ${parts.join(' • ')}',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: ColorConstants.primary,
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: ColorConstants.dashboardPink.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: ColorConstants.dashboardPink.withOpacity(0.15),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.filter_list,
+                              size: 16,
+                              color: ColorConstants.dashboardPink,
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                parts.join(' • '),
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: ColorConstants.dashboardPink,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      '$total shown',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        color: ColorConstants.onSurfaceVariant,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: ColorConstants.dashboardPink,
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Text(
+                          '$total',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 );
               }),
             ],
@@ -646,12 +631,22 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
         ),
         const SizedBox(height: 6),
         Container(
+          height: 48,
           decoration: BoxDecoration(
             color: ColorConstants.background,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: ColorConstants.borderWhite10),
+            boxShadow: [
+              BoxShadow(
+                color: ColorConstants.dashboardShadow,
+                blurRadius: 8,
+                spreadRadius: 0,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(width: 12),
               Icon(
@@ -678,7 +673,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                     ),
                     border: InputBorder.none,
                     isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    contentPadding: EdgeInsets.zero,
                   ),
                 ),
               ),
@@ -718,32 +713,43 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
         ),
         const SizedBox(height: 6),
         Container(
+          height: 48,
           decoration: BoxDecoration(
             color: ColorConstants.background,
             borderRadius: BorderRadius.circular(6),
             border: Border.all(color: ColorConstants.borderWhite10),
+            boxShadow: [
+              BoxShadow(
+                color: ColorConstants.dashboardShadow,
+                blurRadius: 8,
+                spreadRadius: 0,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: currentValue,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                color: ColorConstants.onSurface,
+          child: Center(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: currentValue,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  color: ColorConstants.onSurface,
+                ),
+                dropdownColor: ColorConstants.surfaceContainerHigh,
+                isExpanded: true,
+                items: items
+                    .map(
+                      (String item) => DropdownMenuItem<String>(
+                        value: item,
+                        child: Text(item),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) onChanged(value);
+                },
               ),
-              dropdownColor: ColorConstants.surfaceContainerHigh,
-              isExpanded: true,
-              items: items
-                  .map(
-                    (String item) => DropdownMenuItem<String>(
-                      value: item,
-                      child: Text(item),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                if (value != null) onChanged(value);
-              },
             ),
           ),
         ),
@@ -752,24 +758,6 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
   }
 
   // ── Filter label helpers ───────────────────────────────────────────────
-  String get _trimesterLabel {
-    switch (_controller.selectedTrimester.value) {
-      case 1:
-        return '1st Trimester';
-      case 2:
-        return '2nd Trimester';
-      case 3:
-        return '3rd Trimester';
-      default:
-        return 'All Trimesters';
-    }
-  }
-
-  String get _riskLevelLabel {
-    final risk = _controller.selectedRiskLevel.value;
-    return risk.isNotEmpty ? risk : 'Any Risk';
-  }
-
   String get _doctorLabel {
     final doctorId = _controller.selectedDoctorId.value;
     if (doctorId == null) return 'All Doctors';
@@ -777,27 +765,6 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
         .where((d) => d.id == doctorId)
         .firstOrNull;
     return doctor?.name ?? 'All Doctors';
-  }
-
-  void _onTrimesterChanged(String label) {
-    switch (label) {
-      case '1st Trimester':
-        _controller.setTrimester(1);
-      case '2nd Trimester':
-        _controller.setTrimester(2);
-      case '3rd Trimester':
-        _controller.setTrimester(3);
-      default:
-        _controller.setTrimester(null);
-    }
-  }
-
-  void _onRiskLevelChanged(String label) {
-    if (label == 'Any Risk') {
-      _controller.setRiskLevel('');
-    } else {
-      _controller.setRiskLevel(label);
-    }
   }
 
   void _onDoctorChanged(String label) {
@@ -884,6 +851,14 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
             );
           }
 
+          // Use a guaranteed minimum cell height (mainAxisExtent) rather than
+          // a childAspectRatio so the card content (Week/Doctor chips, vitals,
+          // View Details button) never overflows on narrow handsets — the fixed
+          // ratio shrank card height with column width, clipping ~84px.
+          final double mainAxisExtent = crossAxisCount == 1
+              ? 300
+              : (crossAxisCount == 2 ? 330 : 300);
+
           return GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -891,7 +866,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
               crossAxisCount: crossAxisCount,
               crossAxisSpacing: 24,
               mainAxisSpacing: 24,
-              childAspectRatio: 1.75,
+              mainAxisExtent: mainAxisExtent,
             ),
             itemCount: filtered.length,
             itemBuilder: (context, index) {
@@ -905,19 +880,23 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
 
   Widget _buildPatientCard(Patient patient) {
     final bool isHighRisk = patient.riskLevel == RiskLevel.high;
-    final Color riskColor = isHighRisk
-        ? ColorConstants.error
-        : ColorConstants.tertiary;
-    final Color riskBgColor = isHighRisk
-        ? ColorConstants.errorContainer.withOpacity(0.15)
-        : ColorConstants.tertiaryContainer.withOpacity(0.15);
+    final Color riskColor = isHighRisk ? ColorConstants.error : Colors.white;
+    final Color riskBgColor = Colors.white.withOpacity(0.15);
 
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: ColorConstants.cardBackground.withOpacity(0.7),
+        color: ColorConstants.primary,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: ColorConstants.borderWhite10),
+        boxShadow: [
+          BoxShadow(
+            color: ColorConstants.dashboardShadow,
+            blurRadius: 14,
+            spreadRadius: 2,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -926,22 +905,6 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Container(
-              //   width: 56,
-              //   height: 56,
-              //   decoration: BoxDecoration(
-              //     borderRadius: BorderRadius.circular(12),
-              //     border: Border.all(
-              //       color: ColorConstants.primary.withOpacity(0.2),
-              //       width: 2,
-              //     ),
-              //     image: DecorationImage(
-              //       image: NetworkImage(patient.profileImage ?? ''),
-              //       fit: BoxFit.cover,
-              //     ),
-              //   ),
-              // ),
-              // const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -951,7 +914,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
-                        color: ColorConstants.onSurface,
+                        color: Colors.white,
                       ),
                     ),
                     Text(
@@ -959,7 +922,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: ColorConstants.onSurfaceVariant,
+                        color: Colors.white.withOpacity(0.85),
                       ),
                     ),
                   ],
@@ -995,9 +958,9 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: ColorConstants.surfaceContainer,
+                    color: Colors.white.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: ColorConstants.borderWhite5),
+                    border: Border.all(color: Colors.white.withOpacity(0.15)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1008,7 +971,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.05,
-                          color: ColorConstants.onSurfaceVariant,
+                          color: Colors.white.withOpacity(0.85),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -1020,7 +983,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
-                                color: ColorConstants.primary,
+                                color: Colors.white,
                               ),
                             ),
                             TextSpan(
@@ -1028,7 +991,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w400,
-                                color: ColorConstants.onSurfaceVariant,
+                                color: Colors.white.withOpacity(0.85),
                               ),
                             ),
                           ],
@@ -1043,9 +1006,9 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: ColorConstants.surfaceContainer,
+                    color: Colors.white.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: ColorConstants.borderWhite5),
+                    border: Border.all(color: Colors.white.withOpacity(0.15)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1056,7 +1019,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.05,
-                          color: ColorConstants.onSurfaceVariant,
+                          color: Colors.white.withOpacity(0.85),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -1065,7 +1028,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: ColorConstants.onSurface,
+                          color: Colors.white,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1083,7 +1046,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
               fontSize: 10,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.05,
-              color: ColorConstants.onSurfaceVariant,
+              color: Colors.white.withOpacity(0.85),
             ),
           ),
           const SizedBox(height: 8),
@@ -1099,12 +1062,13 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                 );
               },
               style: OutlinedButton.styleFrom(
-                foregroundColor: ColorConstants.primary,
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.white.withOpacity(0.12),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
-                side: BorderSide(color: ColorConstants.primary),
+                side: BorderSide(color: Colors.white.withOpacity(0.3)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -1117,10 +1081,10 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Icon(
+                  const Icon(
                     Icons.arrow_forward,
                     size: 16,
-                    color: ColorConstants.primary,
+                    color: Colors.white,
                   ),
                 ],
               ),

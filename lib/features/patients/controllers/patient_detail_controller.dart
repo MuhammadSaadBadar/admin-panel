@@ -128,6 +128,53 @@ class PatientDetailController extends GetxController {
     }
   }
 
+  final RxBool isMarkingPaid = false.obs;
+
+  /// Admin manually records that this patient has paid (no payment gateway).
+  ///
+  /// Calls `POST /accounts/patients/{id}/mark-paid/` with an optional
+  /// transaction reference and received amount. On success the patient object
+  /// is refreshed so the UI reflects the new paid state.
+  Future<void> markPatientPaid({
+    String? paymentReference,
+    String? amountPaid,
+  }) async {
+    final currentPatient = patient.value;
+    if (currentPatient == null) return;
+
+    isMarkingPaid.value = true;
+    try {
+      debugPrint(
+        '[PatientDetailController] markPatientPaid — id=${currentPatient.id}',
+      );
+      final updated = await _repository.markPatientPaid(
+        currentPatient.id,
+        paymentReference: paymentReference,
+        amountPaid: amountPaid,
+      );
+      patient.value = updated;
+      debugPrint(
+        '[PatientDetailController] markPatientPaid — success id=${updated.id}',
+      );
+      Get.snackbar(
+        'Payment Recorded',
+        'This patient now has full access.',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 3),
+      );
+    } catch (e) {
+      debugPrint('[PatientDetailController] markPatientPaid — ERROR: $e');
+      Get.snackbar(
+        'Error',
+        'Could not record payment. Please try again.',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 4),
+      );
+    } finally {
+      isMarkingPaid.value = false;
+    }
+  }
+
   Future<void> updateAccountStatus(bool isActive) async {
     final currentPatient = patient.value;
     if (currentPatient == null) return;

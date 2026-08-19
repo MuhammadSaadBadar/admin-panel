@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../models/appointment.dart';
+import '../models/payment_methods.dart';
 import '../repositories/appointment_repository.dart';
 
 /// Controller for the Appointment Details screen.
@@ -20,6 +21,9 @@ class AppointmentDetailController extends GetxController {
   final RxBool isLoading = false.obs;
   final RxBool isProcessingAction = false.obs;
   final RxnString error = RxnString();
+  final Rxn<PlatformPaymentMethods> paymentMethods =
+      Rxn<PlatformPaymentMethods>();
+  final RxBool isPaymentMethodsLoading = false.obs;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────
 
@@ -193,6 +197,117 @@ class AppointmentDetailController extends GetxController {
       Get.snackbar(
         'Error',
         'Could not save notes. Please try again.',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 4),
+      );
+    } finally {
+      isProcessingAction.value = false;
+    }
+  }
+
+  // ── Payment workflow ──────────────────────────────────────────────────
+
+  /// Loads the platform's configured payment methods (dynamic, never hardcoded).
+  Future<void> loadPaymentMethods() async {
+    if (isPaymentMethodsLoading.value) return;
+    isPaymentMethodsLoading.value = true;
+    debugPrint('[AppointmentDetailController] loadPaymentMethods called');
+    try {
+      final methods = await _repository.getPaymentMethods();
+      paymentMethods.value = methods;
+      debugPrint(
+        '[AppointmentDetailController] loadPaymentMethods — success '
+        'hasAny=${methods.hasAnyMethod} price=${methods.subscriptionPriceAmount}',
+      );
+    } catch (e) {
+      debugPrint(
+        '[AppointmentDetailController] loadPaymentMethods — ERROR: $e',
+      );
+    } finally {
+      isPaymentMethodsLoading.value = false;
+    }
+  }
+
+  /// Patient marks this appointment as paid (step 1 of the manual flow).
+  ///
+  /// Only allowed when the backend payment state is pending/rejected. After a
+  /// successful call the appointment's payment enters "awaiting verification".
+  Future<void> markPaid() async {
+    final current = appointment.value;
+    if (current == null || !current.patientCanMarkPaid) {
+      debugPrint(
+        '[AppointmentDetailController] markPaid — not allowed '
+        '(state=${current?.payment?.status.name ?? 'none'})',
+      );
+      return;
+    }
+    isProcessingAction.value = true;
+    debugPrint('[AppointmentDetailController] markPaid — id=${current.id}');
+    try {
+      final updated = await _repository.markPaid(current.id);
+      appointment.value = updated;
+      debugPrint(
+        '[AppointmentDetailController] markPaid — success id=${updated.id} '
+        'paymentState=${updated.payment?.status.displayLabel}',
+      );
+      Get.snackbar(
+        'Payment Recorded',
+        'Your payment is now awaiting verification.',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 3),
+      );
+    } catch (e) {
+      debugPrint('[AppointmentDetailController] markPaid — ERROR: $e');
+      Get.snackbar(
+        'Error',
+        'Could not record payment. Please try again.',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 4),
+      );
+    } finally {
+      isProcessingAction.value = false;
+    }
+  }
+
+  /// Doctor/admin verifies the claimed payment was received (step 2).
+  ///
+  /// This confirms both the payment and the appointment in a single backend
+  /// call. Only allowed when the payment is awaiting verification.
+  Future<void> verifyPayment({String? paymentReference}) async {
+    final current = appointment.value;
+    if (current == null || !current.canVerifyPayment) {
+      debugPrint(
+        '[AppointmentDetailController] verifyPayment — not allowed '
+        '(state=${current?.payment?.status.name ?? 'none'})',
+      );
+      return;
+    }
+    isProcessingAction.value = true;
+    debugPrint(
+      '[AppointmentDetailController] verifyPayment — id=${current.id}',
+    );
+    try {
+      final updated = await _repository.verifyPayment(
+        current.id,
+        paymentReference: paymentReference,
+      );
+      appointment.value = updated;
+      debugPrint(
+        '[AppointmentDetailController] verifyPayment — success id=${updated.id} '
+        'paymentState=${updated.payment?.status.displayLabel} '
+        'apptStatus=${updated.status.displayLabel}',
+      );
+      Get.snackbar(
+        'Payment Verified',
+        'Payment received and appointment confirmed.',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 3),
+      );
+    } catch (e) {
+      debugPrint('[AppointmentDetailController] verifyPayment — ERROR: $e');
+      Get.snackbar(
+        'Error',
+        'Could not verify payment. Please try again.',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 4),
       );

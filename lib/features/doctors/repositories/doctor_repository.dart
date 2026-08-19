@@ -15,18 +15,37 @@ class DoctorRepository {
 
   DoctorRepository(this._apiClient);
 
-  Future<List<Doctor>> getDoctors() async {
-    debugPrint('[DoctorRepo] getDoctors called — ${ApiConstants.doctors}');
-    final response = await _apiClient.get(ApiConstants.doctors);
+  /// Fetches the list of doctors.
+  ///
+  /// The backend `GET /api/v1/accounts/doctors/` endpoint supports pagination
+  /// via `page_size` (DRF paginated response: `{ count, next, previous,
+  /// results }`). We request a generous page size (default 50) so the
+  /// dashboard has a meaningful working set for client-side search/filtering —
+  /// the endpoint does **not** support server-side `q`/`specialization`/`status`
+  /// filtering, only pagination.
+  Future<List<Doctor>> getDoctors({int pageSize = 50}) async {
+    final queryParameters = <String, dynamic>{'page_size': pageSize};
+    debugPrint(
+      '[DoctorRepo] getDoctors called — ${ApiConstants.doctors} '
+      'queryParameters=$queryParameters',
+    );
+    final response = await _apiClient.get(
+      ApiConstants.doctors,
+      queryParameters: queryParameters,
+    );
     debugPrint(
       '[DoctorRepo] getDoctors response — status=${response.statusCode}',
     );
 
     if (response.data is Map<String, dynamic>) {
       final data = response.data as Map<String, dynamic>;
+      final count = data['count'];
       final results = data['results'] as List? ?? [];
       final doctors = results.map((json) => Doctor.fromJson(json)).toList();
-      debugPrint('[DoctorRepo] getDoctors parsed — ${doctors.length} doctors');
+      debugPrint(
+        '[DoctorRepo] getDoctors parsed — ${doctors.length} doctors '
+        '(total on server=$count)',
+      );
       return doctors;
     } else if (response.data is List) {
       // Fallback for non-paginated response
@@ -281,11 +300,24 @@ class DoctorRepository {
       'body=${_sanitizeResponse(response.data)}',
     );
 
-    final parsed = Doctor.fromJson(response.data);
+    var parsed = Doctor.fromJson(response.data);
     debugPrint(
       '[DoctorRepo] toggleDoctorActive parsed — id=${parsed.id} '
       'isActive=${parsed.isActive}',
     );
+
+    // The PATCH endpoint returns only the fields that were updated (e.g.
+    // `is_active`, `first_name`, ...) and may NOT include the doctor's `id`.
+    // `Doctor.fromJson` defaults a missing `id` to 0, which would corrupt the
+    // object stored in the controllers and cause the next toggle to PATCH
+    // `/doctors/0/` (404). Preserve the requested doctor ID in that case.
+    if (parsed.id == 0) {
+      parsed = parsed.copyWith(id: id);
+      debugPrint(
+        '[DoctorRepo] toggleDoctorActive — response omitted id; '
+        'preserving requested id=$id',
+      );
+    }
     return parsed;
   }
 

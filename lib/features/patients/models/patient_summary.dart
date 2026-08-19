@@ -1,3 +1,5 @@
+import 'diet_plan.dart' show DietFoodToAvoid, DietPlanAuthor, DietPlanMeal;
+
 class PatientSummary {
   final PregnancyProgress? pregnancyProgress;
   final LatestBloodPressure? latestBloodPressure;
@@ -124,21 +126,66 @@ class LatestBloodSugar {
 }
 
 class ActiveDietPlan {
+  final int id;
   final bool isActive;
   final int hydrationRecommendationMl;
   final String notes;
+  final List<DietPlanMeal> meals;
+  final List<DietFoodToAvoid> foodsToAvoid;
+  final DietPlanAuthor? createdBy;
+  final String createdAt;
+  final String updatedAt;
 
   ActiveDietPlan({
-    required this.isActive,
-    required this.hydrationRecommendationMl,
-    required this.notes,
+    this.id = 0,
+    this.isActive = false,
+    this.hydrationRecommendationMl = 0,
+    this.notes = '',
+    this.meals = const [],
+    this.foodsToAvoid = const [],
+    this.createdBy,
+    this.createdAt = '',
+    this.updatedAt = '',
   });
 
-  factory ActiveDietPlan.fromJson(Map<String, dynamic> json) => ActiveDietPlan(
-    isActive: json['is_active'] ?? false,
-    hydrationRecommendationMl: json['hydration_recommendation_ml'] ?? 0,
-    notes: json['notes'] ?? '',
-  );
+  /// The `/reports/patient-summary/` endpoint returns `active_diet_plan` as a
+  /// **full** `DietPlan` object (id, meals, foods_to_avoid, created_by,
+  /// timestamps). Parse it directly rather than re-declaring the fields.
+  factory ActiveDietPlan.fromJson(Map<String, dynamic> json) {
+    final id = (json['id'] as num?)?.toInt() ?? 0;
+    return ActiveDietPlan(
+      id: id,
+      isActive: (json['is_active'] as bool?) ?? false,
+      hydrationRecommendationMl:
+          (json['hydration_recommendation_ml'] as num?)?.toInt() ?? 0,
+      notes: (json['notes'] as String?) ?? '',
+      meals: _parseMeals(json['meals']),
+      foodsToAvoid: _parseFoods(json['foods_to_avoid']),
+      createdBy: json['created_by'] is Map
+          ? DietPlanAuthor.fromJson(
+              (json['created_by'] as Map).cast<String, dynamic>(),
+            )
+          : null,
+      createdAt: (json['created_at'] as String?) ?? '',
+      updatedAt: (json['updated_at'] as String?) ?? '',
+    );
+  }
+
+  static List<DietPlanMeal> _parseMeals(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => DietPlanMeal.fromJson(e.cast<String, dynamic>()))
+        .toList();
+  }
+
+  static List<DietFoodToAvoid> _parseFoods(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => DietFoodToAvoid.fromJson(e.cast<String, dynamic>()))
+        .toList();
+  }
 }
 
 class UpcomingAppointment {
