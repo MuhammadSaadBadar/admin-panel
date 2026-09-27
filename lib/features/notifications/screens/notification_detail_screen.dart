@@ -281,21 +281,21 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen>
           SizedBox(height: isMobile ? 16 : 24),
 
           // Delivery status
-          _buildDeliveryRow(
-            Icons.smartphone,
-            'Push notification',
-            notification.channelPushSent,
-            isMobile,
-          ),
-          SizedBox(height: isMobile ? 8 : 12),
-          _buildDeliveryRow(
-            Icons.chat,
-            'WhatsApp message',
-            notification.channelWhatsappSent,
-            isMobile,
-          ),
+          // _buildDeliveryRow(
+          //   Icons.smartphone,
+          //   'Push notification',
+          //   notification.channelPushSent,
+          //   isMobile,
+          // ),
+          // SizedBox(height: isMobile ? 8 : 12),
+          // _buildDeliveryRow(
+          //   Icons.chat,
+          //   'WhatsApp message',
+          //   notification.channelWhatsappSent,
+          //   isMobile,
+          // ),
 
-          SizedBox(height: isMobile ? 16 : 24),
+          // SizedBox(height: isMobile ? 16 : 24),
 
           // Timestamp
           Row(

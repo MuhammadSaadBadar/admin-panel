@@ -372,6 +372,15 @@ class Appointment {
 
   /// Whether a doctor/admin can verify this appointment's payment.
   bool get canVerifyPayment => payment?.status.canVerify ?? false;
+
+  /// Whether `POST /appointments/{id}/status/` with `status=confirmed` is the
+  /// correct backend call for this appointment (no payment attached — free
+  /// consultation). When false, the only correct path to `confirmed` is via
+  /// `POST .../payment/confirm/` after the patient marks the fee as paid.
+  bool get canConfirmFreely => payment == null;
+
+  /// Whether this appointment has a consultation fee that is not yet verified/paid.
+  bool get isUnpaid => hasPayment && payment?.status != PaymentState.verified;
 }
 
 /// Paginated appointments response wrapper, matching the API's

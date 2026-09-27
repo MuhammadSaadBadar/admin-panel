@@ -878,10 +878,8 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
     );
   }
 
-  Widget _buildPatientCard(Patient patient) {
-    final bool isHighRisk = patient.riskLevel == RiskLevel.high;
-    final Color riskColor = isHighRisk ? ColorConstants.error : Colors.white;
-    final Color riskBgColor = Colors.white.withOpacity(0.15);
+Widget _buildPatientCard(Patient patient) {
+    final String ageLabel = _formatAge(patient.age);
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -928,26 +926,6 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: riskBgColor,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: riskColor.withOpacity(0.2)),
-                ),
-                child: Text(
-                  isHighRisk ? 'High Risk' : 'Normal',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.05,
-                    color: riskColor,
-                  ),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -966,7 +944,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Pregnancy Status',
+                        'Age',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
@@ -979,19 +957,11 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                         text: TextSpan(
                           children: [
                             TextSpan(
-                              text: 'Wk ${patient.week}',
+                              text: ageLabel,
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.white,
-                              ),
-                            ),
-                            TextSpan(
-                              text: ' (${patient.trimester})',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
-                                color: Colors.white.withOpacity(0.85),
                               ),
                             ),
                           ],
@@ -1014,7 +984,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Primary Doctor',
+                        'Contact Number ',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
@@ -1024,7 +994,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        patient.doctor,
+                        patient.phoneNumber,
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -1041,7 +1011,7 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
           const SizedBox(height: 16),
           // Vitals
           Text(
-            "Today's Vitals",
+            "Vitals",
             style: GoogleFonts.plusJakartaSans(
               fontSize: 10,
               fontWeight: FontWeight.w700,
@@ -1051,48 +1021,53 @@ class _PatientManagementScreenState extends State<PatientManagementScreen>
           ),
           const SizedBox(height: 8),
 
-          // View Details Button
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () {
-                Get.toNamed(
-                  RouteNames.patientDetail,
-                  arguments: {'patientId': patient.id},
-                );
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: Colors.white.withOpacity(0.12),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                side: BorderSide(color: Colors.white.withOpacity(0.3)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'View Details',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(
-                    Icons.arrow_forward,
-                    size: 16,
-                    color: Colors.white,
-                  ),
-                ],
-              ),
-            ),
-          ),
+// View Details Button
+           SizedBox(
+             width: double.infinity,
+             child: OutlinedButton(
+               onPressed: () {
+                 Get.toNamed(
+                   RouteNames.patientDetail,
+                   arguments: {'patientId': patient.id},
+                 );
+               },
+               style: OutlinedButton.styleFrom(
+                 foregroundColor: Colors.white,
+                 backgroundColor: Colors.white.withOpacity(0.12),
+                 padding: const EdgeInsets.symmetric(vertical: 12),
+                 shape: RoundedRectangleBorder(
+                   borderRadius: BorderRadius.circular(8),
+                 ),
+                 side: BorderSide(color: Colors.white.withOpacity(0.3)),
+               ),
+               child: Row(
+                 mainAxisAlignment: MainAxisAlignment.center,
+                 children: [
+                   Text(
+                     'View Details',
+                     style: GoogleFonts.plusJakartaSans(
+                       fontSize: 14,
+                       fontWeight: FontWeight.w700,
+                     ),
+                   ),
+                   const SizedBox(width: 8),
+                   const Icon(
+                     Icons.arrow_forward,
+                     size: 16,
+                     color: Colors.white,
+                   ),
+                 ],
+               ),
+             ),
+           ),
         ],
       ),
     );
+  }
+
+  String _formatAge(int? age) {
+    if (age == null || age <= 0) return 'Unknown';
+    return age.toString();
   }
 
   // Existing _buildPagination removed since we are using infinite scrolling

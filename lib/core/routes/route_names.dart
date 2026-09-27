@@ -21,6 +21,8 @@ class RouteNames {
   static const String medicationHistory = '/patients/medication-history';
   static const String medicationIntakeDetail =
       '/patients/medication-intake-detail';
+  static const String bloodSugarHistory = '/patients/blood-sugar-history';
+  static const String bloodPressureHistory = '/patients/blood-pressure-history';
   static const String appointments = '/appointments';
   static const String appointmentDetail = '/appointments/detail';
   static const String reports = '/reports';
@@ -33,4 +35,5 @@ class RouteNames {
   static const String profileChangePassword = '/profile/change-password';
   static const String sos = '/sos';
   static const String sosDetail = '/sos/detail';
+  static const String accountsPaymentMethods = '/accounts/payment-methods/';
 }

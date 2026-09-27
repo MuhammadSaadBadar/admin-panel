@@ -368,21 +368,18 @@ class _ComposeBroadcastScreenState extends State<ComposeBroadcastScreen> {
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: ColorConstants
-                            .onPrimary, // Change spinner color for contrast
+                        color: ColorConstants.primary,
                       ),
                     )
                   : const Icon(
                       Icons.send,
                       size: 18,
-                      color: ColorConstants.onPrimary,
-                    ), // Icon color on white
+                    ),
               label: Text(
                 _isSending ? 'Sending...' : 'Send Broadcast',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: isMobile ? 12 : 13,
                   fontWeight: FontWeight.w700,
-                  color: ColorConstants.onPrimary, // Text color on white
                 ),
               ),
               style: ElevatedButton.styleFrom(

@@ -947,6 +947,7 @@ class _ActionButton extends StatelessWidget {
         style: GoogleFonts.plusJakartaSans(
           fontSize: isMobile ? 11 : 12,
           fontWeight: FontWeight.w700,
+          color: Colors.white,
         ),
       ),
       style: OutlinedButton.styleFrom(

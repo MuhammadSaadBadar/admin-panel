@@ -2090,22 +2090,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 color: ColorConstants.dashboardInk,
               ),
             ),
-            TextButton(
-              onPressed: () {},
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: Text(
-                'View All',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: ColorConstants.dashboardPink,
-                ),
-              ),
-            ),
+            // TextButton(
+            //   onPressed: () {},
+            //   style: TextButton.styleFrom(
+            //     padding: EdgeInsets.zero,
+            //     minimumSize: Size.zero,
+            //     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            //   ),
+            //   child: Text(
+            //     'View All',
+            //     style: TextStyle(
+            //       fontSize: 12.5,
+            //       fontWeight: FontWeight.w700,
+            //       color: ColorConstants.dashboardPink,
+            //     ),
+            //   ),
+            //),
           ],
         ),
         const SizedBox(height: 8),
@@ -2117,7 +2117,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 label: 'Revenue This Month',
                 subtitle: 'Commission earned',
                 value: _formatMoney(revenueThisMonth),
-                emoji: '💲',
+                emoji: '',
                 isHighlighted: false,
               ),
               const SizedBox(width: 10),
@@ -2399,17 +2399,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   color: ColorConstants.dashboardInk,
                 ),
               ),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: ColorConstants.dashboardAmber.withOpacity(0.18),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(emoji, style: const TextStyle(fontSize: 14)),
-                ),
-              ),
+              // Container(
+              //   width: 32,
+              //   height: 32,
+              //   decoration: BoxDecoration(
+              //     color: ColorConstants.dashboardAmber.withOpacity(0.18),
+              //     shape: BoxShape.circle,
+              //   ),
+              //   child: Center(
+              //     child: Text(emoji, style: const TextStyle(fontSize: 14)),
+              //   ),
+              // ),
             ],
           ),
         ],

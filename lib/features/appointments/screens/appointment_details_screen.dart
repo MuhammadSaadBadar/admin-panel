@@ -36,6 +36,16 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen>
   late final AppointmentDetailController _controller;
   int _appointmentId = 0;
 
+  /// Set to `true` as soon as any mutating action on this screen (status
+  /// change, payment verify, reschedule, doctor notes) writes a new
+  /// `Appointment` to the controller. Used by [PopScope] below to ship
+  /// the latest snapshot back to the caller via `Get.back(result:)`.
+  bool _dirty = false;
+
+  /// Worker that flips [_dirty] whenever the controller's appointment
+  /// changes after the initial load.
+  Worker? _dirtyWorker;
+
   @override
   void initState() {
     super.initState();
@@ -58,6 +68,15 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen>
       }
     });
 
+    // Mark the screen dirty on every controller-level change to the
+    // appointment snapshot. The Worker is attached AFTER the initial
+    // loadAppointment call so the very first assignment (which mirrors
+    // whatever the caller already had) doesn't count as a mutation.
+    _dirtyWorker = ever<Appointment?>(
+      _controller.appointment,
+      _onAppointmentChanged,
+    );
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
@@ -69,8 +88,23 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen>
     _animationController.forward();
   }
 
+  void _onAppointmentChanged(Appointment? next) {
+    if (next == null) return;
+    // Only mark dirty once we have a non-null snapshot loaded; the first
+    // load fires here too, so we additionally require that the id matches
+    // the screen's target id (the very first emission is the one we
+    // triggered in initState).
+    if (next.id == _appointmentId && _controller.hasLoadedOnce) {
+      _dirty = true;
+      debugPrint(
+        '[AppointmentDetails] dirty=true after appointment update id=${next.id}',
+      );
+    }
+  }
+
   @override
   void dispose() {
+    _dirtyWorker?.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -79,21 +113,37 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen>
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width < 768;
 
-    return Scaffold(
-      backgroundColor: ColorConstants.scaffoldBackground,
-      body: DashboardBackground(
-        child: SafeArea(
-          child: isMobile
-              ? _buildMain(isMobile)
-              : Row(
-                  children: [
-                    _buildSidebar(),
-                    Expanded(child: _buildMain(isMobile)),
-                  ],
-                ),
+    // We control the pop ourselves so that we can attach the latest
+    // appointment snapshot as the route's `result` — which the dashboard
+    // tile awaits to keep its list in sync with whatever mutation the
+    // user made on this screen.
+    return PopScope<Appointment?>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        final snapshot = _dirty ? _controller.appointment.value : null;
+        debugPrint(
+          '[AppointmentDetails] pop intercepted — shipping result '
+          'dirty=$_dirty id=${snapshot?.id} status=${snapshot?.status.displayLabel ?? 'n/a'}',
+        );
+        Navigator.of(context).pop<Appointment?>(snapshot);
+      },
+      child: Scaffold(
+        backgroundColor: ColorConstants.scaffoldBackground,
+        body: DashboardBackground(
+          child: SafeArea(
+            child: isMobile
+                ? _buildMain(isMobile)
+                : Row(
+                    children: [
+                      _buildSidebar(),
+                      Expanded(child: _buildMain(isMobile)),
+                    ],
+                  ),
+          ),
         ),
+        bottomNavigationBar: null,
       ),
-      bottomNavigationBar: null,
     );
   }
 
@@ -604,15 +654,21 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen>
 
     // pending -> confirmed | cancelled
     if (status == AppointmentStatus.pending) {
-      actions.add(
-        _ActionChip(
-          label: 'Confirm',
-          icon: Icons.check,
-          color: ColorConstants.tertiary,
-          isMobile: isMobile,
-          onPressed: () => _controller.confirmAppointment(),
-        ),
-      );
+      // The top-level "Confirm" chip is only valid when there is NO payment
+      // attached (free consultation). When a payment is attached the backend
+      // rejects `pending → confirmed` on /status/ with a 400 — the correct
+      // path is `POST .../payment/confirm/` from the Payment section below.
+      if (appointment.canConfirmFreely) {
+        actions.add(
+          _ActionChip(
+            label: 'Confirm (Free Consultation)',
+            icon: Icons.check,
+            color: ColorConstants.tertiary,
+            isMobile: isMobile,
+            onPressed: () => _controller.confirmAppointment(),
+          ),
+        );
+      }
       actions.add(
         _ActionChip(
           label: 'Cancel',
@@ -689,7 +745,94 @@ class _AppointmentDetailsScreenState extends State<AppointmentDetailsScreen>
               ),
             ),
           ],
+          if (status == AppointmentStatus.pending && !appointment.canConfirmFreely)
+            _buildPaymentBlockedBanner(appointment, isMobile),
         ],
+      ),
+    );
+  }
+
+  /// Visible warning banner shown in the Actions card when the appointment
+  /// cannot be confirmed because the consultation fee has not been verified.
+  Widget _buildPaymentBlockedBanner(Appointment appointment, bool isMobile) {
+    final paymentState = appointment.payment?.status ?? PaymentState.none;
+
+    final Color bannerColor;
+    final IconData bannerIcon;
+    final String title;
+    final String message;
+
+    switch (paymentState) {
+      case PaymentState.pending:
+        bannerColor = Colors.orange.shade600;
+        bannerIcon = Icons.payments_outlined;
+        title = 'Awaiting Patient Payment';
+        message =
+            'The patient has not yet submitted payment for this consultation. '
+            'This appointment cannot be confirmed until the patient marks '
+            'the fee as paid and you verify it in the Payment section below.';
+        break;
+      case PaymentState.awaitingVerification:
+        bannerColor = Colors.amber.shade700;
+        bannerIcon = Icons.pending_actions;
+        title = 'Payment Awaiting Verification';
+        message =
+            'The patient has submitted payment. Please verify the receipt '
+            'in the Payment section below to confirm this appointment.';
+        break;
+      case PaymentState.rejected:
+        bannerColor = ColorConstants.error;
+        bannerIcon = Icons.cancel_outlined;
+        title = 'Payment Rejected';
+        message =
+            'This payment was previously rejected. The patient must resubmit '
+            'payment before this appointment can be confirmed.';
+        break;
+      default:
+        return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Container(
+        decoration: BoxDecoration(
+          color: bannerColor.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: bannerColor.withOpacity(0.3)),
+        ),
+        padding: EdgeInsets.all(isMobile ? 12 : 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(bannerIcon, color: bannerColor, size: isMobile ? 18 : 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: isMobile ? 12 : 13,
+                      fontWeight: FontWeight.w700,
+                      color: bannerColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    message,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: isMobile ? 11 : 12,
+                      fontWeight: FontWeight.w400,
+                      color: bannerColor.withOpacity(0.85),
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

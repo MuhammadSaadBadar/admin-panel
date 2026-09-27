@@ -11,7 +11,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <application
-        android:label="Mama Health Admin"
+        android:label="Admin gynae hub"
         android:name="${applicationName}"
         android:usesCleartextTraffic="false"
         android:icon="@mipmap/ic_launcher">

@@ -326,18 +326,26 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
           _SymptomsAndDietCard(
             isMobile: isMobile,
             summary: summary,
-            onDietPlanTap: _openDietManagement,
+            onDietPlanTap: _controller.isLoadingPatient.value || _controller.isLoadingSummary.value
+                ? null
+                : _openDietManagement,
+            dietButtonColor: _controller.isLoadingPatient.value || _controller.isLoadingSummary.value
+                ? ColorConstants.onSurfaceVariant
+                : null,
           ),
           const SizedBox(height: 16),
-          _MedicationsCard(
-            isMobile: isMobile,
-            onRemindersTap: _openMedicationReminders,
-            onHistoryTap: _openMedicationHistory,
-          ),
+_MedicationsCard(
+             isMobile: isMobile,
+             onRemindersTap: _controller.isLoadingPatient.value || _controller.isLoadingSummary.value
+                 ? null
+                 : _openMedicationReminders,
+             onHistoryTap: _controller.isLoadingPatient.value || _controller.isLoadingSummary.value
+                 ? null
+                 : _openMedicationHistory,
+           ),
           const SizedBox(height: 16),
           _AppointmentHistoryCard(isMobile: isMobile, summary: summary),
-          const SizedBox(height: 16),
-          _MedicalReportsCard(isMobile: isMobile, summary: summary),
+
           const SizedBox(height: 16),
           _SosHistoryCard(isMobile: isMobile, controller: _controller),
           const SizedBox(height: 80), // Padding for fab
@@ -372,18 +380,25 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
                 _SymptomsAndDietCard(
                   isMobile: false,
                   summary: summary,
-                  onDietPlanTap: _openDietManagement,
+                  onDietPlanTap: _controller.isLoadingPatient.value || _controller.isLoadingSummary.value
+                      ? null
+                      : _openDietManagement,
+                  dietButtonColor: _controller.isLoadingPatient.value || _controller.isLoadingSummary.value
+                      ? ColorConstants.onSurfaceVariant
+                      : null,
                 ),
                 const SizedBox(height: 24),
-                _MedicationsCard(
-                  isMobile: false,
-                  onRemindersTap: _openMedicationReminders,
-                  onHistoryTap: _openMedicationHistory,
-                ),
+_MedicationsCard(
+                   isMobile: false,
+                   onRemindersTap: _controller.isLoadingPatient.value || _controller.isLoadingSummary.value
+                       ? null
+                       : _openMedicationReminders,
+                   onHistoryTap: _controller.isLoadingPatient.value || _controller.isLoadingSummary.value
+                       ? null
+                       : _openMedicationHistory,
+                 ),
                 const SizedBox(height: 24),
                 _AppointmentHistoryCard(isMobile: false, summary: summary),
-                const SizedBox(height: 24),
-                _MedicalReportsCard(isMobile: false, summary: summary),
                 const SizedBox(height: 24),
                 _SosHistoryCard(isMobile: false, controller: _controller),
               ],
@@ -440,6 +455,32 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen>
     );
     await Get.toNamed(
       RouteNames.medicationHistory,
+      arguments: {'patientId': _patientId},
+    );
+    if (mounted) {
+      _controller.loadPatientSummary(_patientId);
+    }
+  }
+
+  Future<void> _openBloodPressureHistory() async {
+    debugPrint(
+      '[PatientDetails] Opening Blood Pressure History for patientId=$_patientId',
+    );
+    await Get.toNamed(
+      RouteNames.bloodPressureHistory,
+      arguments: {'patientId': _patientId},
+    );
+    if (mounted) {
+      _controller.loadPatientSummary(_patientId);
+    }
+  }
+
+  Future<void> _openBloodSugarHistory() async {
+    debugPrint(
+      '[PatientDetails] Opening Blood Sugar History for patientId=$_patientId',
+    );
+    await Get.toNamed(
+      RouteNames.bloodSugarHistory,
       arguments: {'patientId': _patientId},
     );
     if (mounted) {
@@ -741,8 +782,9 @@ class _PersonalInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ageLabel = patient.age != null ? '${patient.age} Yrs' : 'N/A';
     final dob = patient.patientProfile?.dateOfBirth != null
-        ? '${patient.patientProfile!.dateOfBirth} (${patient.age} Yrs)'
+        ? '${patient.patientProfile!.dateOfBirth} ($ageLabel)'
         : 'N/A';
     final emergencyContactName =
         (patient.patientProfile?.emergencyContactName?.isNotEmpty ?? false)
@@ -1195,12 +1237,14 @@ class _HealthTrackersCard extends StatelessWidget {
 class _SymptomsAndDietCard extends StatelessWidget {
   final bool isMobile;
   final PatientSummary? summary;
-  final VoidCallback onDietPlanTap;
+  final Future<void> Function()? onDietPlanTap;
+  final Color? dietButtonColor;
 
   const _SymptomsAndDietCard({
     required this.isMobile,
     required this.summary,
     required this.onDietPlanTap,
+    this.dietButtonColor,
   });
 
   @override
@@ -1268,8 +1312,8 @@ class _SymptomsAndDietCard extends StatelessWidget {
                 ),
               ),
               style: OutlinedButton.styleFrom(
-                foregroundColor: ColorConstants.onPrimary,
-                side: BorderSide(color: ColorConstants.onPrimary),
+                foregroundColor: dietButtonColor ?? ColorConstants.onPrimary,
+                side: BorderSide(color: dietButtonColor ?? ColorConstants.onPrimary),
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -1469,136 +1513,10 @@ class _AppointmentHistoryCard extends StatelessWidget {
   }
 }
 
-class _MedicalReportsCard extends StatelessWidget {
-  final bool isMobile;
-  final PatientSummary? summary;
-
-  const _MedicalReportsCard({required this.isMobile, this.summary});
-
-  @override
-  Widget build(BuildContext context) {
-    // Show live adherence data from the patient summary instead of a static
-    // placeholder. If no summary/adherence data is present, show an
-    // informative empty state.
-    final adherence = summary?.medicineAdherence;
-    final hasAdherence =
-        adherence != null &&
-        (adherence.taken > 0 || adherence.skipped > 0 || adherence.pending > 0);
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(isMobile ? 12 : 16),
-      decoration: BoxDecoration(
-        color: ColorConstants.cardBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ColorConstants.borderWhite10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Medical Reports',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: isMobile ? 18 : 20,
-                  fontWeight: FontWeight.w600,
-                  color: ColorConstants.onSurface,
-                ),
-              ),
-              Icon(
-                Icons.assessment,
-                color: ColorConstants.primary,
-                size: isMobile ? 20 : 24,
-              ),
-            ],
-          ),
-          SizedBox(height: isMobile ? 8 : 12),
-          if (!hasAdherence)
-            Text(
-              'No medical reports available.',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                color: ColorConstants.onSurfaceVariant,
-              ),
-            )
-          else ...[
-            // Medicine adherence summary pulled from the live summary API.
-            _buildAdherenceRow(
-              'Medication Adherence',
-              adherence.taken,
-              adherence.skipped,
-              adherence.pending,
-              isMobile,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAdherenceRow(
-    String label,
-    int taken,
-    int skipped,
-    int pending,
-    bool isMobile,
-  ) {
-    final total = taken + skipped + pending;
-    final rate = total > 0 ? (taken / total * 100).round() : 0;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              label,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: isMobile ? 12 : 14,
-                fontWeight: FontWeight.w600,
-                color: ColorConstants.onSurface,
-              ),
-            ),
-            Text(
-              '$rate%',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: isMobile ? 14 : 16,
-                fontWeight: FontWeight.w700,
-                color: ColorConstants.primary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: LinearProgressIndicator(
-            value: total > 0 ? rate / 100 : 0,
-            backgroundColor: ColorConstants.surfaceContainerHighest,
-            color: ColorConstants.primary,
-            minHeight: isMobile ? 6 : 8,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '$taken taken • $skipped skipped • $pending pending',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: isMobile ? 11 : 12,
-            color: ColorConstants.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _MedicationsCard extends StatelessWidget {
   final bool isMobile;
-  final VoidCallback onRemindersTap;
-  final VoidCallback onHistoryTap;
+  final Future<void> Function()? onRemindersTap;
+  final Future<void> Function()? onHistoryTap;
 
   const _MedicationsCard({
     required this.isMobile,
@@ -1612,7 +1530,7 @@ class _MedicationsCard extends StatelessWidget {
       required IconData icon,
       required String title,
       required String subtitle,
-      required VoidCallback onTap,
+      required Future<void> Function()? onTap,
       required Color accent,
     }) {
       return Container(
@@ -1800,91 +1718,112 @@ class _BabySizeCard extends StatelessWidget {
             ],
           ),
           SizedBox(height: isMobile ? 8 : 12),
-          Obx(() {
-            if (controller.isLoadingBabySize.value) {
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(12),
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              );
-            }
-            if (controller.babySizeError.value != null) {
-              return Text(
-                'Baby size data unavailable.',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
-                  color: ColorConstants.onSurfaceVariant,
-                ),
-              );
-            }
-            final baby = controller.babySize.value;
-            if (baby == null) {
-              return Text(
-                'No baby size data for this week.',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
-                  color: ColorConstants.onSurfaceVariant,
-                ),
-              );
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.straighten,
-                      color: ColorConstants.primary,
-                      size: isMobile ? 16 : 18,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Week ${baby.week}',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: isMobile ? 16 : 18,
-                        fontWeight: FontWeight.w700,
-                        color: ColorConstants.primary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  baby.sizeComparison.isNotEmpty
-                      ? 'Size of a ${baby.sizeComparison}'
-                      : 'Size comparison not available.',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: isMobile ? 14 : 16,
-                    fontWeight: FontWeight.w600,
-                    color: ColorConstants.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 4,
-                  children: [
-                    if (baby.lengthCm.isNotEmpty)
-                      _buildMetric('Length', baby.lengthCm, 'cm'),
-                    if (baby.weightGrams.isNotEmpty)
-                      _buildMetric('Weight', baby.weightGrams, 'g'),
-                  ],
-                ),
-                if (baby.description.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    baby.description,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                      color: ColorConstants.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ],
-            );
-          }),
+Obx(() {
+             if (controller.isLoadingBabySize.value) {
+               return const Center(
+                 child: Padding(
+                   padding: EdgeInsets.all(12),
+                   child: CircularProgressIndicator(strokeWidth: 2),
+                 ),
+               );
+             }
+             if (controller.babySizeError.value != null) {
+               return Text(
+                 'Failed to load baby size data: ${controller.babySizeError.value}',
+                 style: GoogleFonts.plusJakartaSans(
+                   fontSize: 14,
+                   color: ColorConstants.onSurfaceVariant,
+                 ),
+               );
+             }
+             final baby = controller.babySize.value;
+             if (baby == null) {
+               return Text(
+                 'Baby size data is loading...',
+                 style: GoogleFonts.plusJakartaSans(
+                   fontSize: 14,
+                   color: ColorConstants.onSurfaceVariant,
+                 ),
+               );
+             }
+             return Column(
+               crossAxisAlignment: CrossAxisAlignment.start,
+               children: [
+                 Row(
+                   children: [
+                     Icon(
+                       Icons.straighten,
+                       color: ColorConstants.primary,
+                       size: isMobile ? 16 : 18,
+                     ),
+                     const SizedBox(width: 6),
+                     Text(
+                       'Week ${baby.week}',
+                       style: GoogleFonts.plusJakartaSans(
+                         fontSize: isMobile ? 16 : 18,
+                         fontWeight: FontWeight.w700,
+                         color: ColorConstants.primary,
+                       ),
+                     ),
+                   ],
+                 ),
+                 const SizedBox(height: 8),
+                 if (baby.sizeComparison.isNotEmpty)
+                   Text(
+                     'Size of a ${baby.sizeComparison}',
+                     style: GoogleFonts.plusJakartaSans(
+                       fontSize: isMobile ? 14 : 16,
+                       fontWeight: FontWeight.w600,
+                       color: ColorConstants.onSurface,
+                     ),
+                   ),
+                 if (baby.sizeComparison.isEmpty &&
+                     (baby.lengthCm.isNotEmpty || baby.weightGrams.isNotEmpty))
+                   Text(
+                     'Size details for this week are not available.',
+                     style: GoogleFonts.plusJakartaSans(
+                       fontSize: isMobile ? 14 : 16,
+                       fontWeight: FontWeight.w600,
+                       color: ColorConstants.onSurface,
+                     ),
+                   ),
+                 if (baby.sizeComparison.isEmpty &&
+                     baby.lengthCm.isEmpty &&
+                     baby.weightGrams.isEmpty &&
+                     baby.description.isEmpty)
+                   Text(
+                     'No size comparison data available for this week.',
+                     style: GoogleFonts.plusJakartaSans(
+                       fontSize: isMobile ? 14 : 16,
+                       fontWeight: FontWeight.w600,
+                       color: ColorConstants.onSurfaceVariant,
+                     ),
+                   ),
+                 const SizedBox(height: 8),
+                 Wrap(
+                   spacing: 16,
+                   runSpacing: 4,
+                   children: [
+                     if (baby.lengthCm.isNotEmpty)
+                       _buildMetric('Length', baby.lengthCm, 'cm'),
+                     if (baby.weightGrams.isNotEmpty)
+                       _buildMetric('Weight', baby.weightGrams, 'g'),
+                   ],
+                 ),
+                 if (baby.description.isNotEmpty) ...[
+                   const SizedBox(height: 8),
+                   Text(
+                     baby.description,
+                     style: GoogleFonts.plusJakartaSans(
+                       fontSize: 12,
+                       fontStyle: FontStyle.italic,
+                       color: ColorConstants.onSurfaceVariant,
+                     ),
+                   ),
+                 ],
+               ],
+             );
+           }),
         ],
       ),
     );

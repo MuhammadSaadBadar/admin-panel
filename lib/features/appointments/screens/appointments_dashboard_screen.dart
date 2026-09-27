@@ -280,7 +280,8 @@ class _AppointmentManagementScreenState
   Widget _buildTabs(bool isMobile) {
     final tabs = <({int id, String label})>[
       (id: 0, label: 'Upcoming'),
-      (id: 1, label: 'Past'),
+      (id: 1, label: 'Unpaid'),
+      (id: 2, label: 'Past'),
     ];
 
     return Container(
@@ -390,6 +391,20 @@ class _AppointmentManagementScreenState
       );
 
       if (appointments.isEmpty) {
+        final String emptyMessage;
+        switch (_controller.selectedTabIndex.value) {
+          case 0:
+            emptyMessage = 'No upcoming appointments found';
+            break;
+          case 1:
+            emptyMessage = 'No unpaid appointments found';
+            break;
+          case 2:
+            emptyMessage = 'No past appointments found';
+            break;
+          default:
+            emptyMessage = 'No appointments found';
+        }
         return Center(
           child: Padding(
             padding: EdgeInsets.symmetric(vertical: isMobile ? 32 : 48),
@@ -402,7 +417,7 @@ class _AppointmentManagementScreenState
                 ),
                 SizedBox(height: isMobile ? 12 : 16),
                 Text(
-                  'No appointments found',
+                  emptyMessage,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: isMobile ? 14 : 16,
                     fontWeight: FontWeight.w500,
@@ -454,14 +469,21 @@ class _AppointmentTile extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () {
+        onTap: () async {
           debugPrint(
             '[AppointmentDashboard] navigating to details for id=${appointment.id}',
           );
-          Get.toNamed(
+          final updated = await Get.toNamed<Appointment?>(
             RouteNames.appointmentDetail,
             arguments: {'appointmentId': appointment.id},
           );
+          if (updated != null) {
+            debugPrint(
+              '[AppointmentDashboard] details returned updated appointment — '
+              'merging into list id=${updated.id} status=${updated.status.displayLabel}',
+            );
+            controller.applyExternalUpdate(updated);
+          }
         },
         child: Padding(
           padding: EdgeInsets.all(isMobile ? 12 : 16),
@@ -523,6 +545,10 @@ class _AppointmentTile extends StatelessWidget {
                 appointment.appointmentType.displayLabel,
                 isMobile,
               ),
+              if (appointment.hasPayment) ...[
+                const SizedBox(height: 8),
+                _buildPaymentStatusRow(isMobile),
+              ],
               SizedBox(height: isMobile ? 12 : 16),
               Divider(height: 1, color: ColorConstants.borderWhite5),
               SizedBox(height: isMobile ? 12 : 16),
@@ -586,6 +612,61 @@ class _AppointmentTile extends StatelessWidget {
     );
   }
 
+  Widget _buildPaymentStatusRow(bool isMobile) {
+    final payment = appointment.payment!;
+    final Color paymentColor;
+    final IconData paymentIcon;
+    switch (payment.status) {
+      case PaymentState.pending:
+        paymentColor = Colors.orange.shade600;
+        paymentIcon = Icons.hourglass_empty;
+        break;
+      case PaymentState.awaitingVerification:
+        paymentColor = Colors.amber.shade700;
+        paymentIcon = Icons.pending_actions;
+        break;
+      case PaymentState.verified:
+        paymentColor = ColorConstants.success;
+        paymentIcon = Icons.verified;
+        break;
+      case PaymentState.rejected:
+        paymentColor = ColorConstants.error;
+        paymentIcon = Icons.cancel;
+        break;
+      case PaymentState.none:
+        return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Payment',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: isMobile ? 10 : 12,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.05,
+            color: ColorConstants.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Icon(paymentIcon, color: paymentColor, size: isMobile ? 16 : 18),
+            SizedBox(width: isMobile ? 4 : 6),
+            Text(
+              payment.status.displayLabel,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: isMobile ? 12 : 14,
+                fontWeight: FontWeight.w600,
+                color: paymentColor,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildDetailRow(
     IconData icon,
     String label,
@@ -632,15 +713,33 @@ class _AppointmentTile extends StatelessWidget {
 
     // pending -> confirmed | cancelled
     if (status == AppointmentStatus.pending) {
-      actions.add(
-        _ActionButton(
-          label: 'Confirm',
-          icon: Icons.check,
-          color: ColorConstants.tertiary,
-          isMobile: isMobile,
-          onPressed: () => controller.confirmAppointment(appointment.id),
-        ),
-      );
+      if (appointment.canConfirmFreely) {
+        actions.add(
+          _ActionButton(
+            label: 'Confirm (Free Consultation)',
+            icon: Icons.check,
+            color: ColorConstants.tertiary,
+            isMobile: isMobile,
+            onPressed: () => controller.confirmAppointment(appointment.id),
+          ),
+        );
+      } else {
+        actions.add(
+          Obx(() {
+            final isProcessing = controller.isProcessingAction.value;
+            return _ActionButton(
+              label: isProcessing ? 'Verifying...' : 'Verify Payment & Confirm',
+              icon: Icons.verified_user,
+              color: ColorConstants.success,
+              isMobile: isMobile,
+              onPressed: () {
+                if (isProcessing) return;
+                controller.confirmAppointment(appointment.id);
+              },
+            );
+          }),
+        );
+      }
       actions.add(
         _ActionButton(
           label: 'Cancel',
@@ -695,7 +794,12 @@ class _AppointmentTile extends StatelessWidget {
       );
     }
 
-    return Wrap(spacing: 8, runSpacing: 8, children: actions);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(spacing: 8, runSpacing: 8, children: actions),
+      ],
+    );
   }
 
   void _confirmCancel() {

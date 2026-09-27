@@ -1,18 +1,4 @@
-enum RiskLevel { high, normal }
 
-class Vitals {
-  final int waterIntake;
-  final String kicks;
-  final String bloodPressure;
-  final bool isBpNormal;
-
-  const Vitals({
-    required this.waterIntake,
-    required this.kicks,
-    required this.bloodPressure,
-    required this.isBpNormal,
-  });
-}
 
 class PatientProfile {
   final String? dateOfBirth;
@@ -64,13 +50,6 @@ class Patient {
   final DateTime? dateJoined;
   final PatientProfile? patientProfile;
 
-  // UI-specific mock properties
-  final RiskLevel riskLevel;
-  final String trimester;
-  final int week;
-  final String doctor;
-  final Vitals vitals;
-
   Patient({
     required this.id,
     required this.email,
@@ -80,21 +59,11 @@ class Patient {
     required this.isActive,
     this.dateJoined,
     this.patientProfile,
-    this.riskLevel = RiskLevel.normal,
-    this.trimester = '',
-    this.week = 0,
-    this.doctor = '',
-    this.vitals = const Vitals(
-      waterIntake: 0,
-      kicks: '',
-      bloodPressure: '',
-      isBpNormal: true,
-    ),
   });
 
   String get name => '$firstName $lastName'.trim();
 
-  int get age {
+  int? get age {
     if (patientProfile?.dateOfBirth != null) {
       final dob = DateTime.tryParse(patientProfile!.dateOfBirth!);
       if (dob != null) {
@@ -107,7 +76,7 @@ class Patient {
         return age;
       }
     }
-    return 0;
+    return null;
   }
 
   factory Patient.fromJson(Map<String, dynamic> json) => Patient(

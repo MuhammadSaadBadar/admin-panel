@@ -1,4 +1,7 @@
+// lib/features/profile/screens/admin_profile_screen.dart
+
 import 'package:admin/core/widgets/app_drawer.dart';
+import 'package:admin/features/profile/widgets/commission_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -38,11 +41,11 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     debugPrint('[AdminProfileScreen] initState');
     _controller = Get.find<ProfileController>();
     _controller.resetSaveState();
-    _loadProfile();
+    _loadData();
   }
 
-  Future<void> _loadProfile() async {
-    await _controller.loadProfile();
+  Future<void> _loadData() async {
+    await _controller.loadAllData();
 
     // Populate the edit form with the freshly loaded profile.
     final profile = _controller.profile.value;
@@ -98,7 +101,6 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     final bool isMobile = MediaQuery.of(context).size.width < 768;
 
     return Scaffold(
-      // Shared navigation drawer on mobile (hamburger + swipe-to-open).
       drawer: isMobile
           ? AppDrawer(
               currentRoute: RouteNames.profile,
@@ -159,6 +161,8 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
 
   // ── Content ────────────────────────────────────────────────────────────
   Widget _buildProfileContent(AdminProfile profile, ColorScheme colorScheme) {
+    final isWide = MediaQuery.of(context).size.width > 900;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -183,7 +187,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Manage your personal information and account.',
+                    'Manage your personal information and platform settings.',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 14,
                       color: ColorConstants.primary.withOpacity(0.7),
@@ -192,40 +196,41 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                 ],
               ),
             ),
-            if (!_isEditing) _buildEditButton(colorScheme),
+            const SizedBox(width: 16),
+            if (!_isEditing) Flexible(child: _buildEditButton(colorScheme)),
           ],
         ),
         const SizedBox(height: 24),
 
         // Profile content
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth > 900;
-            if (isWide) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: _buildProfileCard(profile, colorScheme),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    flex: 1,
-                    child: _buildAccountCard(profile, colorScheme),
-                  ),
-                ],
-              );
-            }
-            return Column(
-              children: [
-                _buildProfileCard(profile, colorScheme),
-                const SizedBox(height: 10),
-                _buildAccountCard(profile, colorScheme),
-              ],
-            );
-          },
-        ),
+        if (isWide)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 2, child: _buildProfileCard(profile, colorScheme)),
+              const SizedBox(width: 20),
+              Expanded(
+                flex: 1,
+                child: Column(
+                  children: [
+                    _buildAccountCard(profile, colorScheme),
+                    const SizedBox(height: 20),
+                    const CommissionTile(),
+                  ],
+                ),
+              ),
+            ],
+          )
+        else
+          Column(
+            children: [
+              _buildProfileCard(profile, colorScheme),
+              const SizedBox(height: 20),
+              _buildAccountCard(profile, colorScheme),
+              const SizedBox(height: 20),
+              const CommissionTile(),
+            ],
+          ),
       ],
     );
   }
@@ -235,7 +240,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: ColorConstants.primary, // Changed to primary
+        color: ColorConstants.primary,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: ColorConstants.onPrimary.withOpacity(0.2)),
       ),
@@ -313,10 +318,6 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
         crossAxisCount: isNarrow ? 1 : 2,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        // Use a guaranteed item height (mainAxisExtent) instead of a ratio so
-        // each info tile (label + value) has enough room on narrow Android
-        // screens — the fixed 8:1 ratio shrank tile height with column width,
-        // causing a 15px bottom overflow on the value.
         mainAxisExtent: 76,
       ),
       children: [
@@ -367,7 +368,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: ColorConstants.primary, // Container with primary color
+        color: ColorConstants.primary,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: ColorConstants.onPrimary.withOpacity(0.2)),
       ),
@@ -460,6 +461,36 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Edit mode banner
+        Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.white.withOpacity(0.25)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.edit_note,
+                color: Colors.white.withOpacity(0.85),
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Editing profile',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withOpacity(0.85),
+                ),
+              ),
+            ],
+          ),
+        ),
+
         GridView(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -467,8 +498,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
             crossAxisCount: isNarrow ? 1 : 2,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            // Guaranteed height so the label + text field fit on small screens.
-            mainAxisExtent: 86,
+            mainAxisExtent: 90,
           ),
           children: [
             _buildEditField('First Name', _firstNameController, colorScheme),
@@ -478,6 +508,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
               _phoneController,
               colorScheme,
               isMono: true,
+              keyboardType: TextInputType.phone,
             ),
           ],
         ),
@@ -487,25 +518,34 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
           if (_controller.saveError.value != null) {
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.error_outline,
-                    color: ColorConstants.error,
-                    size: 18,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: ColorConstants.error.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: ColorConstants.error.withOpacity(0.4),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _controller.saveError.value!,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        color: ColorConstants.error,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _controller.saveError.value!,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           }
@@ -523,12 +563,22 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
             children: [
               TextButton(
                 onPressed: () => setState(() => _isEditing = false),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: BorderSide(color: Colors.white.withOpacity(0.3)),
+                  ),
+                ),
                 child: Text(
                   'Cancel',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: ColorConstants.onPrimary.withOpacity(0.7),
+                    color: ColorConstants.onPrimary.withOpacity(0.85),
                   ),
                 ),
               ),
@@ -539,6 +589,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: ColorConstants.primary,
+                    elevation: 0,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 24,
                       vertical: 12,
@@ -556,13 +607,20 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                             color: ColorConstants.primary,
                           ),
                         )
-                      : Text(
-                          'Save Changes',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: ColorConstants.primary,
-                          ),
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.check, size: 16),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Save Changes',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: ColorConstants.primary,
+                              ),
+                            ),
+                          ],
                         ),
                 ),
               ),
@@ -573,11 +631,13 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     );
   }
 
+  // ── FIXED: Edit Field — white bg, dark text, visible on teal card ──────
   Widget _buildEditField(
     String label,
     TextEditingController controller,
     ColorScheme colorScheme, {
     bool isMono = false,
+    TextInputType? keyboardType,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -588,33 +648,59 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
           style: GoogleFonts.plusJakartaSans(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: ColorConstants.onPrimary.withOpacity(0.7),
+            color: ColorConstants.onPrimary.withOpacity(0.85),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: ColorConstants.onPrimary.withOpacity(0.2),
-            ),
-            color: ColorConstants.onPrimary.withOpacity(0.1),
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.10),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: TextField(
             controller: controller,
+            keyboardType: keyboardType,
+            cursorColor: ColorConstants.primary,
             style: GoogleFonts.plusJakartaSans(
-              fontSize: isMono ? 14 : 16,
-              fontWeight: isMono ? FontWeight.w500 : FontWeight.w400,
-              color: ColorConstants.onPrimary,
+              fontSize: isMono ? 14 : 15,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF003737),
+              letterSpacing: isMono ? 0.3 : 0,
             ),
             decoration: InputDecoration(
-              border: InputBorder.none,
               hintStyle: GoogleFonts.plusJakartaSans(
-                color: ColorConstants.onPrimary.withOpacity(0.5),
+                fontSize: 14,
+                color: const Color(0xFF003737).withOpacity(0.35),
               ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 10,
+                horizontal: 14,
+                vertical: 12,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(
+                  color: ColorConstants.primary.withOpacity(0.2),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(
+                  color: ColorConstants.primary.withOpacity(0.2),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(
+                  color: ColorConstants.primary,
+                  width: 1.5,
+                ),
               ),
             ),
           ),
@@ -628,7 +714,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: ColorConstants.primary, // Changed to primary
+        color: ColorConstants.primary,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: ColorConstants.onPrimary.withOpacity(0.2)),
       ),
@@ -752,17 +838,8 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
 
   // ── Header / Sidebar / Error / Empty / Buttons ─────────────────────────
   Widget _buildEditButton(ColorScheme colorScheme) {
-    return TextButton.icon(
+    return TextButton(
       onPressed: _startEditing,
-      icon: Icon(Icons.edit, color: ColorConstants.primary, size: 16),
-      label: Text(
-        'Edit Profile',
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: ColorConstants.primary,
-        ),
-      ),
       style: TextButton.styleFrom(
         backgroundColor: Colors.white,
         foregroundColor: ColorConstants.primary,
@@ -771,6 +848,24 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
           borderRadius: BorderRadius.circular(10),
           side: BorderSide(color: ColorConstants.primary.withOpacity(0.3)),
         ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.edit, color: ColorConstants.primary, size: 16),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              'Edit Profile',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: ColorConstants.primary,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -860,7 +955,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
-                              color: ColorConstants.primary,
+                              color: ColorConstants.onPrimary,
                             ),
                           ),
                           Text(
@@ -868,7 +963,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 12,
-                              color: ColorConstants.primary.withOpacity(0.7),
+                              color: ColorConstants.onPrimary.withOpacity(0.7),
                             ),
                           ),
                         ],
@@ -961,7 +1056,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: _loadProfile,
+              onPressed: _loadData,
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(

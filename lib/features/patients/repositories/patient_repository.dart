@@ -237,21 +237,22 @@ class PatientRepository {
       '[PatientRepo] getDietPlans response — status=${response.statusCode}',
     );
 
-    final PaginatedDietPlans parsed;
+    final List<dynamic> rawList;
     if (response.data is Map<String, dynamic>) {
-      parsed = PaginatedDietPlans.fromJson(response.data);
+      rawList = (response.data as Map<String, dynamic>)['results'] as List? ?? [];
+    } else if (response.data is List) {
+      rawList = response.data as List;
     } else {
-      debugPrint(
-        '[PatientRepo] getDietPlans — unexpected response shape, returning empty',
-      );
-      parsed = const PaginatedDietPlans(count: 0, results: []);
+      rawList = [];
     }
 
-    debugPrint(
-      '[PatientRepo] getDietPlans parsed — ${parsed.results.length} plans '
-      '(total=${parsed.count})',
-    );
-    return parsed.results;
+    final results = rawList
+        .whereType<Map>()
+        .map((e) => DietPlan.fromJson(e.cast<String, dynamic>()))
+        .toList();
+
+    debugPrint('[PatientRepo] getDietPlans parsed — ${results.length} plans');
+    return results;
   }
 
   /// Fetches the patient's currently active diet plan, or `null` if none.
@@ -375,21 +376,22 @@ class PatientRepository {
       'status=${response.statusCode}',
     );
 
-    final PaginatedMedicineReminders parsed;
+    final List<dynamic> rawList;
     if (response.data is Map<String, dynamic>) {
-      parsed = PaginatedMedicineReminders.fromJson(response.data);
+      rawList = (response.data as Map<String, dynamic>)['results'] as List? ?? [];
+    } else if (response.data is List) {
+      rawList = response.data as List;
     } else {
-      debugPrint(
-        '[PatientRepo] getMedicineReminders — unexpected shape, returning empty',
-      );
-      parsed = const PaginatedMedicineReminders(count: 0, results: []);
+      rawList = [];
     }
 
-    debugPrint(
-      '[PatientRepo] getMedicineReminders parsed — ${parsed.results.length} '
-      'reminders (total=${parsed.count})',
-    );
-    return parsed.results;
+    final results = rawList
+        .whereType<Map>()
+        .map((e) => MedicineReminder.fromJson(e.cast<String, dynamic>()))
+        .toList();
+
+    debugPrint('[PatientRepo] getMedicineReminders parsed — ${results.length} reminders');
+    return results;
   }
 
   /// Creates a new medicine reminder for a patient.
@@ -502,20 +504,53 @@ class PatientRepository {
       'status=${response.statusCode}',
     );
 
-    final PaginatedMedicineIntakeLogs parsed;
+    final List<dynamic> rawList;
     if (response.data is Map<String, dynamic>) {
-      parsed = PaginatedMedicineIntakeLogs.fromJson(response.data);
+      rawList = (response.data as Map<String, dynamic>)['results'] as List? ?? [];
+    } else if (response.data is List) {
+      rawList = response.data as List;
     } else {
-      debugPrint(
-        '[PatientRepo] getMedicineIntakeLogs — unexpected shape, returning empty',
-      );
-      parsed = const PaginatedMedicineIntakeLogs(count: 0, results: []);
+      rawList = [];
     }
 
-    debugPrint(
-      '[PatientRepo] getMedicineIntakeLogs parsed — ${parsed.results.length} '
-      'logs (total=${parsed.count})',
-    );
-    return parsed.results;
-  }
+    final results = rawList
+        .whereType<Map>()
+        .map((e) => MedicineIntakeLog.fromJson(e.cast<String, dynamic>()))
+        .toList();
+
+    debugPrint('[PatientRepo] getMedicineIntakeLogs parsed — ${results.length} logs');
+    return results;
+   }
+
+   Future<List<dynamic>> getBloodPressureHistory(int patientId) async {
+     debugPrint('[PatientRepo] getBloodPressureHistory called — patientId=$patientId');
+     final response = await _apiClient.get(
+       ApiConstants.healthBloodPressure,
+       queryParameters: {'patient_id': patientId, 'page_size': 100},
+     );
+     debugPrint('[PatientRepo] getBloodPressureHistory response — status=${response.statusCode}');
+     if (response.data is Map<String, dynamic>) {
+       final results = response.data['results'] as List?;
+       return results ?? [];
+     } else if (response.data is List) {
+       return response.data as List<dynamic>;
+     }
+     return [];
+   }
+
+   Future<List<dynamic>> getBloodSugarHistory(int patientId) async {
+     debugPrint('[PatientRepo] getBloodSugarHistory called — patientId=$patientId');
+     final response = await _apiClient.get(
+       ApiConstants.healthBloodSugar,
+       queryParameters: {'patient_id': patientId, 'page_size': 100},
+     );
+     debugPrint('[PatientRepo] getBloodSugarHistory response — status=${response.statusCode}');
+     if (response.data is Map<String, dynamic>) {
+       final results = response.data['results'] as List?;
+       return results ?? [];
+     } else if (response.data is List) {
+       return response.data as List<dynamic>;
+     }
+     return [];
+   }
 }

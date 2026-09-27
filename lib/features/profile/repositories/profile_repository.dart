@@ -1,11 +1,13 @@
+// lib/features/profile/repositories/profile_repository.dart
+
 import 'package:admin/core/constants/api_constants.dart';
 import 'package:admin/core/network/api_client.dart';
 import 'package:admin/core/network/api_error_mapper.dart';
 import 'package:admin/core/network/api_exceptions.dart';
+import 'package:admin/features/profile/models/admin_profile.dart';
+import 'package:admin/features/profile/models/payment_methods.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-
-import '../models/admin_profile.dart';
 
 /// Repository for the Admin Profile module.
 ///
@@ -13,13 +15,14 @@ import '../models/admin_profile.dart';
 /// - `GET /auth/me/` — fetch the current admin's profile
 /// - `PATCH /auth/me/` — update profile contact fields
 /// - `POST /auth/password/change/` — change the admin's password
-///
-/// Follows the same conventions as [DoctorRepository]: debug logging,
-/// [ApiErrorMapper] for structured errors, and sanitized response bodies.
+/// - `GET /accounts/payment-methods/` — fetch platform payment methods & commission
+/// - `PATCH /accounts/payment-methods/` — update commission percentage
 class ProfileRepository {
   final ApiClient _apiClient;
 
   ProfileRepository(this._apiClient);
+
+  // ── Profile ────────────────────────────────────────────────────────────────
 
   /// Fetches the current admin's profile via `GET /auth/me/`.
   Future<AdminProfile> getCurrentUser() async {
@@ -229,7 +232,80 @@ class ProfileRepository {
     }
   }
 
-  /// Sends the password-change request and logs the response.
+  // ── Payment Methods / Commission ──────────────────────────────────────────
+
+  /// Fetches platform payment methods including commission percentage
+  /// via `GET /accounts/payment-methods/`.
+  Future<PaymentMethods> getPaymentMethods() async {
+    final path = ApiConstants.accountsPaymentMethods;
+    debugPrint('[ProfileRepo] getPaymentMethods called — path=$path');
+
+    try {
+      final response = await _apiClient.get(path);
+      debugPrint(
+        '[ProfileRepo] getPaymentMethods response — status=${response.statusCode}',
+      );
+
+      final paymentMethods = PaymentMethods.fromJson(response.data);
+      debugPrint(
+        '[ProfileRepo] getPaymentMethods parsed — '
+        'commission=${paymentMethods.commissionDisplay}',
+      );
+      return paymentMethods;
+    } on DioException catch (e) {
+      debugPrint(
+        '[ProfileRepo] getPaymentMethods DioException — type=${e.type} '
+        'status=${e.response?.statusCode} message=${e.message}',
+      );
+      final mapped = ApiErrorMapper.mapDioException(
+        e,
+        defaultMessage: 'Unable to load payment methods.',
+      );
+      debugPrint('[ProfileRepo] getPaymentMethods error — $mapped');
+      throw mapped;
+    }
+  }
+
+  /// Updates the platform commission percentage via `PATCH /accounts/payment-methods/`.
+  ///
+  /// Admin-only operation. The commission percentage is a platform-wide setting.
+  Future<PaymentMethods> updateCommission(double percentage) async {
+    final path = ApiConstants.accountsPaymentMethods;
+    final body = {'commission_percentage': percentage.toStringAsFixed(2)};
+
+    debugPrint(
+      '[ProfileRepo] updateCommission called — path=$path '
+      'percentage=${percentage.toStringAsFixed(2)}%',
+    );
+
+    try {
+      final response = await _apiClient.patch(path, data: body);
+      debugPrint(
+        '[ProfileRepo] updateCommission response — status=${response.statusCode}',
+      );
+
+      final paymentMethods = PaymentMethods.fromJson(response.data);
+      debugPrint(
+        '[ProfileRepo] updateCommission parsed — '
+        'commission=${paymentMethods.commissionDisplay}',
+      );
+      return paymentMethods;
+    } on DioException catch (e) {
+      debugPrint(
+        '[ProfileRepo] updateCommission DioException — type=${e.type} '
+        'status=${e.response?.statusCode} message=${e.message}',
+      );
+      final mapped = ApiErrorMapper.mapDioException(
+        e,
+        defaultMessage: 'Unable to update commission percentage.',
+      );
+      debugPrint('[ProfileRepo] updateCommission error — $mapped');
+      throw mapped;
+    }
+  }
+
+  // ── Private helpers ───────────────────────────────────────────────────────
+
   Future<void> _postChangePassword(
     String path,
     Map<String, dynamic> body, {
@@ -272,7 +348,7 @@ class ProfileRepository {
     return detail is String && detail.toLowerCase().contains('old_password');
   }
 
-  // ── Logging helpers ────────────────────────────────────────────────────
+  // ── Logging helpers ───────────────────────────────────────────────────────
 
   /// Masks partial name (keep first char, mask the rest).
   static String _maskName(String name) {

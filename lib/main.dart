@@ -19,7 +19,7 @@ class MamaHealthProApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      title: 'Mama Health',
+      title: 'Admin gynae hub',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       initialBinding: InitialBinding(),

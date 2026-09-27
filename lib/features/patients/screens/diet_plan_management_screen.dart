@@ -720,11 +720,14 @@ class _ActivePlanCard extends StatelessWidget {
                 color: ColorConstants.dashboardInkSoft,
               ),
               const SizedBox(width: 4),
-              Text(
-                'Prescribed by $authorName',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13,
-                  color: ColorConstants.dashboardInkSoft,
+              Flexible(
+                child: Text(
+                  'Prescribed by $authorName',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    color: ColorConstants.dashboardInkSoft,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 12),
@@ -734,11 +737,14 @@ class _ActivePlanCard extends StatelessWidget {
                 color: ColorConstants.dashboardInkSoft,
               ),
               const SizedBox(width: 4),
-              Text(
-                dateLabel,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13,
-                  color: ColorConstants.dashboardInkSoft,
+              Flexible(
+                child: Text(
+                  dateLabel,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    color: ColorConstants.dashboardInkSoft,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

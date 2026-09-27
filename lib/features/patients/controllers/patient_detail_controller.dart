@@ -16,6 +16,8 @@ class PatientDetailController extends GetxController {
   final Rxn<PatientSummary> patientSummary = Rxn<PatientSummary>();
   final RxList<SosEvent> sosHistory = <SosEvent>[].obs;
   final Rxn<BabySizeReference> babySize = Rxn<BabySizeReference>();
+  final RxList<dynamic> bloodPressureHistory = <dynamic>[].obs;
+  final RxList<dynamic> bloodSugarHistory = <dynamic>[].obs;
 
   final RxBool isLoadingPatient = false.obs;
   final RxBool isLoadingSummary = false.obs;
@@ -68,14 +70,16 @@ class PatientDetailController extends GetxController {
   }
 
   Future<void> loadAllData(int id) async {
-    // We can fetch both concurrently to save time. SOS + baby-size are
-    // best-effort secondary loads; failures there must not block the core
-    // patient + summary display.
+    // Patient + summary must load first — baby-size lookup depends on
+    // pregnancyProgress from the summary (currentWeek). SOS + blood
+    // trackers are independent and load concurrently after.
+    await loadPatient(id);
+    await loadPatientSummary(id);
     await Future.wait([
-      loadPatient(id),
-      loadPatientSummary(id),
       loadSosHistory(id),
       loadBabySizeForPatient(id),
+      loadBloodPressureHistory(id),
+      loadBloodSugarHistory(id),
     ]);
   }
 
@@ -103,7 +107,7 @@ class PatientDetailController extends GetxController {
     final week = patientSummary.value?.pregnancyProgress?.currentWeek;
     if (week == null) {
       debugPrint(
-        '[PatientDetailController] No current week available — skipping baby-size.',
+        '[PatientDetailController] No current week available — skipping baby-size. patientSummary: ${patientSummary.value}, pregnancyProgress: ${patientSummary.value?.pregnancyProgress}',
       );
       return;
     }
@@ -115,6 +119,9 @@ class PatientDetailController extends GetxController {
         '[PatientDetailController] Fetching baby-size for week: $week',
       );
       final result = await _repository.getBabySize(week);
+      debugPrint(
+        '[PatientDetailController] Baby-size API response received: week=${result.week}, comparison="${result.sizeComparison}", length="${result.lengthCm}", weight="${result.weightGrams}", description="${result.description}"',
+      );
       babySize.value = result;
       debugPrint(
         '[PatientDetailController] Baby-size loaded — week=${result.week} '
@@ -126,8 +133,34 @@ class PatientDetailController extends GetxController {
     } finally {
       isLoadingBabySize.value = false;
     }
+}
+  
+  Future<void> loadBloodPressureHistory(int id) async {
+    try {
+      debugPrint('[PatientDetailController] Fetching blood pressure history for ID: $id');
+      final result = await _repository.getBloodPressureHistory(id);
+      bloodPressureHistory.assignAll(result);
+      debugPrint(
+          '[PatientDetailController] Blood pressure history loaded — ${result.length} readings',
+      );
+    } catch (e) {
+      debugPrint('[PatientDetailController] Error fetching blood pressure history: $e');
+    }
   }
 
+  Future<void> loadBloodSugarHistory(int id) async {
+    try {
+      debugPrint('[PatientDetailController] Fetching blood sugar history for ID: $id');
+      final result = await _repository.getBloodSugarHistory(id);
+      bloodSugarHistory.assignAll(result);
+      debugPrint(
+          '[PatientDetailController] Blood sugar history loaded — ${result.length} readings',
+      );
+    } catch (e) {
+      debugPrint('[PatientDetailController] Error fetching blood sugar history: $e');
+    }
+  }
+  
   final RxBool isMarkingPaid = false.obs;
 
   /// Admin manually records that this patient has paid (no payment gateway).

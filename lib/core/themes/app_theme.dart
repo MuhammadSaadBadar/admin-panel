@@ -4,9 +4,18 @@ import 'package:google_fonts/google_fonts.dart';
 import '../constants/color_constants.dart';
 
 class AppTheme {
-  // ===========================================================================
+  // ================================================
+  // ===========================
   // LIGHT THEME — ACTIVE / PRIMARY APP THEME
   // ===========================================================================
+
+  // Add these static getters to your AppTheme class
+  static TextStyle get labelMedium => lightTheme.textTheme.labelMedium!;
+  static TextStyle get titleMedium => lightTheme.textTheme.titleMedium!;
+  static TextStyle get bodySmall => lightTheme.textTheme.bodySmall!;
+  // Add other styles you're using:
+  static TextStyle get labelSmall => lightTheme.textTheme.labelSmall!;
+  static TextStyle get titleSmall => lightTheme.textTheme.titleSmall!;
 
   static ThemeData get lightTheme {
     final baseTextTheme = GoogleFonts.interTextTheme(

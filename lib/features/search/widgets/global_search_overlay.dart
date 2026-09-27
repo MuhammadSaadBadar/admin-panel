@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/color_constants.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/routes/route_names.dart';
+import '../../appointments/controllers/appointment_controller.dart';
+import '../../appointments/models/appointment.dart';
 import '../../doctors/models/doctor.dart';
 import '../../patients/models/patient.dart';
 import '../controllers/search_controller.dart';
@@ -358,12 +360,20 @@ class _GlobalSearchOverlayState extends State<GlobalSearchOverlay> {
     Get.toNamed(RouteNames.patientDetail, arguments: {'patientId': patient.id});
   }
 
-  void _openAppointment(AppointmentSearchHit hit) {
+  void _openAppointment(AppointmentSearchHit hit) async {
     Get.back(); // close overlay
-    Get.toNamed(
+    final updated = await Get.toNamed<Appointment?>(
       RouteNames.appointmentDetail,
       arguments: {'appointmentId': hit.id},
     );
+    if (updated != null && Get.isRegistered<AppointmentController>()) {
+      debugPrint(
+        '[GlobalSearch] details returned updated appointment — '
+        'merging into dashboard list id=${updated.id} '
+        'status=${updated.status.displayLabel}',
+      );
+      Get.find<AppointmentController>().applyExternalUpdate(updated);
+    }
   }
 
   void _goToFullList(String route) {
